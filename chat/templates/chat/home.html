@@ -1,0 +1,75 @@
+{% extends 'chat/base.html' %}
+
+{% block content %}
+<div class="dashboard-container">
+
+    <div class="dashboard-header">
+        <h1>Your Chats</h1>
+        <p>Continue your conversations or start a new private chat.</p>
+        <a href="{% url 'users' %}" class="main-btn small-btn">Find User</a>
+    </div>
+
+    <div class="chat-list-card">
+        {% if chatrooms %}
+            {% for room in chatrooms %}
+                <a href="{% url 'chat_room' room.id %}" class="chat-list-item" data-room-id="{{ room.id }}">
+                    <div class="avatar-holder">
+    <div class="user-avatar">
+        {{ room.other_user.username|first|upper }}
+    </div>
+
+    <span 
+        class="status-dot {% if room.other_user.profile.is_online %}online{% else %}offline{% endif %}"
+        data-status-user-id="{{ room.other_user.id }}">
+    </span>
+</div>
+
+                    <div class="chat-info">
+                        <div class="chat-title-row">
+                            <h3>{{ room.other_user.username }}</h3>
+                            <span class="chat-time" data-last-time>
+    {{ room.updated_at|date:"h:i A" }}
+</span>
+                        </div>
+
+                        <div class="chat-preview-row">
+                            {% if room.last_message %}
+                                <p data-last-message>
+    {% if room.last_message %}
+        {% if room.last_message.sender == request.user %}
+            You:
+        {% endif %}
+        {{ room.last_message.message|truncatechars:45 }}
+    {% else %}
+        No messages yet
+    {% endif %}
+</p>
+                            {% else %}
+                                <p>No messages yet</p>
+                            {% endif %}
+
+                            {% if room.unread_count > 0 %}
+                               <span 
+    class="unread-badge"
+    data-unread-badge
+    {% if room.unread_count == 0 %}style="display: none;"{% endif %}>
+    {% if room.unread_count > 0 %}
+        {{ room.unread_count }}
+    {% endif %}
+</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        {% else %}
+            <div class="empty-box">
+                <h2>No chats yet</h2>
+                <p>Search a user and start your first conversation.</p>
+                <a href="{% url 'users' %}" class="main-btn">Start New Chat</a>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

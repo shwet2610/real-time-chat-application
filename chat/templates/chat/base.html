@@ -1,0 +1,126 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ChatVerse</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+</head>
+<body>
+
+<nav class="navbar">
+    <a href="{% url 'home' %}" class="brand">
+        <span class="brand-icon">💬</span>
+        <span>ChatVerse</span>
+    </a>
+
+    <div class="nav-links">
+        {% if user.is_authenticated %}
+            <a href="{% url 'home' %}">Chats</a>
+            <a href="{% url 'users' %}">Find User</a>
+            <span class="nav-user">{{ user.username }}</span>
+            <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
+        {% else %}
+            <a href="{% url 'login' %}">Login</a>
+            <a href="{% url 'register' %}">Register</a>
+        {% endif %}
+    </div>
+</nav>
+
+{% if messages %}
+<div class="toast-area">
+    {% for message in messages %}
+        <div class="toast {{ message.tags }}">
+            {{ message }}
+        </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+<main>
+    {% block content %}
+    {% endblock %}
+</main>
+
+{% if user.is_authenticated %}
+<script>
+    const currentLoggedInUserId = "{{ user.id }}";
+    const activityProtocol = window.location.protocol === "https:" ? "wss" : "ws";
+
+    const activitySocket = new WebSocket(
+        activityProtocol + "://" + window.location.host + "/ws/user-activity/"
+    );
+
+    activitySocket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+
+        if (data.kind === "status_update") {
+            updateOnlineStatus(data);
+        }
+
+        if (data.kind === "chat_notification") {
+            updateChatPreviewAndUnread(data);
+        }
+    };
+
+    function updateOnlineStatus(data) {
+        const dots = document.querySelectorAll(`[data-status-user-id="${data.user_id}"]`);
+
+        dots.forEach(function(dot) {
+            dot.classList.remove("online", "offline");
+            dot.classList.add(data.is_online ? "online" : "offline");
+        });
+
+        const texts = document.querySelectorAll(`[data-status-text-user-id="${data.user_id}"]`);
+
+        texts.forEach(function(text) {
+            text.textContent = data.is_online ? "Online" : "Offline";
+        });
+    }
+
+    function updateChatPreviewAndUnread(data) {
+        const sameChatOpen = window.location.pathname === `/chat/${data.room_id}/`;
+
+        const chatItems = document.querySelectorAll(`[data-room-id="${data.room_id}"]`);
+
+        chatItems.forEach(function(item) {
+            const lastMessage = item.querySelector("[data-last-message]");
+            const lastTime = item.querySelector("[data-last-time]");
+            const unreadBadge = item.querySelector("[data-unread-badge]");
+
+            if (lastMessage) {
+                if (String(data.sender_id) === String(currentLoggedInUserId)) {
+                    lastMessage.textContent = "You: " + data.message;
+                } else {
+                    lastMessage.textContent = data.message;
+                }
+            }
+
+            if (lastTime) {
+                lastTime.textContent = data.created_at;
+            }
+
+            if (unreadBadge) {
+                let count = Number(data.unread_count);
+
+                if (sameChatOpen) {
+                    count = 0;
+                }
+
+                if (count > 0) {
+                    unreadBadge.textContent = count;
+                    unreadBadge.style.display = "inline-flex";
+                } else {
+                    unreadBadge.textContent = "";
+                    unreadBadge.style.display = "none";
+                }
+            }
+        });
+    }
+</script>
+{% endif %}
+
+</body>
+</html>

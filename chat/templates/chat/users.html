@@ -1,0 +1,54 @@
+{% extends 'chat/base.html' %}
+
+{% block content %}
+<div class="dashboard-container">
+
+    <div class="dashboard-header">
+        <h1>Find Users</h1>
+        <p>Search by username or email to start a private chat.</p>
+    </div>
+
+    <form method="GET" class="search-box">
+        <input 
+            type="text" 
+            name="q" 
+            placeholder="Enter username or email..." 
+            value="{{ search_query }}"
+            required
+        >
+        <button type="submit">Search</button>
+    </form>
+
+    {% if search_query %}
+        <div class="users-grid">
+            {% if users %}
+                {% for u in users %}
+                    <div class="user-card">
+                        <div class="avatar large-avatar">
+                            {{ u.username|first|upper }}
+                        </div>
+
+                        <h3>{{ u.username }}</h3>
+                        <p>{{ u.email }}</p>
+
+                        <a href="{% url 'start_chat' u.id %}" class="main-btn">
+                            Start Chat
+                        </a>
+                    </div>
+                {% endfor %}
+            {% else %}
+                <div class="empty-box">
+                    <h2>No user found</h2>
+                    <p>No account matched your search.</p>
+                </div>
+            {% endif %}
+        </div>
+    {% else %}
+        <div class="empty-box">
+            <h2>Search to start chatting</h2>
+            <p>Enter the username or email of the person you want to chat with.</p>
+        </div>
+    {% endif %}
+
+</div>
+{% endblock %}

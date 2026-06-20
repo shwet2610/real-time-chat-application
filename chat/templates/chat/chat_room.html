@@ -1,0 +1,215 @@
+{% extends 'chat/base.html' %}
+
+{% block content %}
+<div class="chat-layout">
+
+    <aside class="chat-sidebar">
+        <div class="sidebar-top">
+            <div>
+                <h2>Messages</h2>
+                <p>Your conversations</p>
+            </div>
+            <a href="{% url 'users' %}" class="new-chat-btn">+</a>
+        </div>
+
+        <div class="sidebar-list">
+            {% for item in chatrooms %}
+                <a href="{% url 'chat_room' item.id %}" class="sidebar-user {% if item.id == room.id %}active{% endif %}" data-room-id="{{ item.id }}">
+                    <div class="avatar-holder">
+    <div class="user-avatar">
+        {{ item.other_user.username|first|upper }}
+    </div>
+
+    <span 
+        class="status-dot {% if item.other_user.profile.is_online %}online{% else %}offline{% endif %}"
+        data-status-user-id="{{ item.other_user.id }}">
+    </span>
+</div>
+
+                    <div class="sidebar-user-info">
+                        <div class="sidebar-name-row">
+                            <h4>{{ item.other_user.username }}</h4>
+
+                            {% if item.unread_count > 0 %}
+                                <span 
+    class="sidebar-unread"
+    data-unread-badge
+    {% if item.unread_count == 0 %}style="display: none;"{% endif %}>
+    {% if item.unread_count > 0 %}
+        {{ item.unread_count }}
+    {% endif %}
+</span>
+                            {% endif %}
+                        </div>
+
+                        {% if item.last_message %}
+                            <p data-last-message>
+    {% if item.last_message %}
+        {% if item.last_message.sender == request.user %}
+            You:
+        {% endif %}
+        {{ item.last_message.message|truncatechars:28 }}
+    {% else %}
+        No messages yet
+    {% endif %}
+</p>
+                        {% else %}
+                            <p>No messages yet</p>
+                        {% endif %}
+                    </div>
+
+                    <span class="sidebar-time" data-last-time>
+    {{ item.updated_at|date:"h:i A" }}
+</span>
+                </a>
+            {% empty %}
+                <div class="sidebar-empty">
+                    <p>No chats yet</p>
+                </div>
+            {% endfor %}
+        </div>
+    </aside>
+
+    <section class="chat-panel">
+
+        <div class="chat-panel-header">
+            <div class="user-avatar big">
+                {{ other_user.username|first|upper }}
+            </div>
+
+            <div>
+                <h2>{{ other_user.username }}</h2>
+                <p data-status-text-user-id="{{ other_user.id }}">
+    {% if other_user.profile.is_online %}
+        Online
+    {% else %}
+        Offline
+    {% endif %}
+</p>
+            </div>
+        </div>
+
+        <div class="chat-body" id="chatMessages">
+            {% if messages_list %}
+                {% for msg in messages_list %}
+                    {% if msg.sender == request.user %}
+                        <div class="bubble-row outgoing">
+                            <div class="bubble">
+                                <p>{{ msg.message }}</p>
+                                <small>{{ msg.created_at|date:"h:i A" }}</small>
+                            </div>
+                        </div>
+                    {% else %}
+                        <div class="bubble-row incoming">
+                            <div class="bubble">
+                                <p>{{ msg.message }}</p>
+                                <small>{{ msg.created_at|date:"h:i A" }}</small>
+                            </div>
+                        </div>
+                    {% endif %}
+                {% endfor %}
+            {% else %}
+                <div class="empty-chat" id="emptyChat">
+                    <div class="empty-icon">💬</div>
+                    <h3>No messages yet</h3>
+                    <p>Send your first message to {{ other_user.username }}</p>
+                </div>
+            {% endif %}
+        </div>
+
+        <form class="chat-compose" id="chatForm"  method="POST">
+             {% csrf_token %}
+            <input 
+                type="text" 
+                id="messageInput"
+                placeholder="Type your message here..."
+                autocomplete="off"
+                required
+            >
+            <button type="submit">
+                Send
+            </button>
+        </form>
+
+    </section>
+
+</div>
+
+<script>
+    const roomId = "{{ room.id }}";
+    const currentUserId = "{{ request.user.id }}";
+
+    const protocol = window.location.protocol === "https:" ? "wss" : "ws";
+    const chatSocket = new WebSocket(
+        protocol + "://" + window.location.host + "/ws/chat/" + roomId + "/"
+    );
+
+    const chatMessages = document.getElementById("chatMessages");
+    const chatForm = document.getElementById("chatForm");
+    const messageInput = document.getElementById("messageInput");
+
+    function scrollToBottom() {
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function addMessageToScreen(data) {
+        const emptyChat = document.getElementById("emptyChat");
+
+        if (emptyChat) {
+            emptyChat.remove();
+        }
+
+        const row = document.createElement("div");
+
+        if (String(data.sender_id) === String(currentUserId)) {
+            row.className = "bubble-row outgoing";
+        } else {
+            row.className = "bubble-row incoming";
+        }
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+
+        const messageText = document.createElement("p");
+        messageText.textContent = data.message;
+
+        const timeText = document.createElement("small");
+        timeText.textContent = data.created_at;
+
+        bubble.appendChild(messageText);
+        bubble.appendChild(timeText);
+        row.appendChild(bubble);
+
+        chatMessages.appendChild(row);
+        scrollToBottom();
+    }
+
+    scrollToBottom();
+
+    chatSocket.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+        addMessageToScreen(data);
+    };
+
+    chatSocket.onclose = function() {
+        console.log("WebSocket closed");
+    };
+
+    chatForm.addEventListener("submit", function(event) {
+        event.preventDefault();
+
+        const message = messageInput.value.trim();
+
+        if (message === "") {
+            return;
+        }
+
+        chatSocket.send(JSON.stringify({
+            message: message
+        }));
+
+        messageInput.value = "";
+        messageInput.focus();
+    });
+</script>
+{% endblock %}
