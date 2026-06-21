@@ -11,7 +11,7 @@ from django.utils import timezone
 from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
-from .models import ChatRoom, Message
+from .models import ChatRoom, Message, Profile
 
 
 
@@ -210,8 +210,32 @@ def chat_room_view(request, room_id):
 
 
 
+# def serialize_message(message):
+#     local_time = timezone.localtime(message.created_at)
+
+#     return {
+#         "id": message.id,
+#         "message_id": message.id,
+#         "room_id": message.room.id,
+#         "message": message.message,
+#         "sender_id": message.sender.id,
+#         "receiver_id": message.receiver.id,
+#         "sender_username": message.sender.username,
+#         "receiver_username": message.receiver.username,
+#         "created_at": local_time.strftime("%I:%M %p"),
+#     }
+
 def serialize_message(message):
     local_time = timezone.localtime(message.created_at)
+
+    reply_data = None
+
+    if message.reply_to:
+        reply_data = {
+            "id": message.reply_to.id,
+            "message": message.reply_to.message,
+            "sender_username": message.reply_to.sender.username,
+        }
 
     return {
         "id": message.id,
@@ -223,8 +247,57 @@ def serialize_message(message):
         "sender_username": message.sender.username,
         "receiver_username": message.receiver.username,
         "created_at": local_time.strftime("%I:%M %p"),
+        "is_edited": message.is_edited,
+        "reply_to": reply_data,
     }
 
+
+
+
+# def send_message_api(request, room_id):
+#     try:
+#         room = ChatRoom.objects.select_related("user1", "user2").get(id=room_id)
+
+#         if request.user.id not in [room.user1_id, room.user2_id]:
+#             return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
+
+#         message_text = request.POST.get("message", "").strip()
+
+#         if message_text == "":
+#             return JsonResponse({"success": False, "error": "Empty message"}, status=400)
+
+#         if request.user.id == room.user1_id:
+#             receiver = room.user2
+#         else:
+#             receiver = room.user1
+
+#         message = Message.objects.create(
+#             room=room,
+#             sender=request.user,
+#             receiver=receiver,
+#             message=message_text,
+#             is_read=False
+#         )
+
+#         room.save()
+
+#         data = serialize_message(message)
+
+#         # WebSocket broadcast: agar websocket connected hai to instant receive hoga
+#         channel_layer = get_channel_layer()
+#         if channel_layer is not None:
+#             async_to_sync(channel_layer.group_send)(
+#                 f"chat_{room.id}",
+#                 {
+#                     "type": "chat_message",
+#                     "data": data,
+#                 }
+#             )
+
+#         return JsonResponse({"success": True, "message": data})
+
+#     except ChatRoom.DoesNotExist:
+#         return JsonResponse({"success": False, "error": "Room not found"}, status=404)
 
 @login_required
 @require_POST
@@ -236,6 +309,7 @@ def send_message_api(request, room_id):
             return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
 
         message_text = request.POST.get("message", "").strip()
+        reply_to_id = request.POST.get("reply_to_id", "").strip()
 
         if message_text == "":
             return JsonResponse({"success": False, "error": "Empty message"}, status=400)
@@ -245,10 +319,19 @@ def send_message_api(request, room_id):
         else:
             receiver = room.user1
 
+        reply_to_message = None
+
+        if reply_to_id:
+            reply_to_message = Message.objects.filter(
+                id=reply_to_id,
+                room=room
+            ).select_related("sender").first()
+
         message = Message.objects.create(
             room=room,
             sender=request.user,
             receiver=receiver,
+            reply_to=reply_to_message,
             message=message_text,
             is_read=False
         )
@@ -256,9 +339,10 @@ def send_message_api(request, room_id):
         room.save()
 
         data = serialize_message(message)
+        data["event_type"] = "new_message"
 
-        # WebSocket broadcast: agar websocket connected hai to instant receive hoga
         channel_layer = get_channel_layer()
+
         if channel_layer is not None:
             async_to_sync(channel_layer.group_send)(
                 f"chat_{room.id}",
@@ -276,6 +360,7 @@ def send_message_api(request, room_id):
 
 @login_required
 @require_GET
+
 def chat_messages_api(request, room_id):
     try:
         room = ChatRoom.objects.get(id=room_id)
@@ -296,10 +381,11 @@ def chat_messages_api(request, room_id):
         ).select_related(
             "sender",
             "receiver",
-            "room"
+            "room",
+            "reply_to",
+            "reply_to__sender"
         ).order_by("created_at")
 
-        # Receiver ke unread messages read mark kar do
         Message.objects.filter(
             room=room,
             receiver=request.user,
@@ -313,6 +399,132 @@ def chat_messages_api(request, room_id):
 
     except ChatRoom.DoesNotExist:
         return JsonResponse({"success": False, "error": "Room not found"}, status=404)
+    
+
+@login_required
+@require_POST
+def edit_message_api(request, room_id, message_id):
+    try:
+        room = ChatRoom.objects.get(id=room_id)
+
+        if request.user.id not in [room.user1_id, room.user2_id]:
+            return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
+
+        message = Message.objects.select_related(
+            "sender",
+            "receiver",
+            "room",
+            "reply_to",
+            "reply_to__sender"
+        ).get(id=message_id, room=room)
+
+        if message.sender_id != request.user.id:
+            return JsonResponse({"success": False, "error": "You can edit only your own message"}, status=403)
+
+        new_text = request.POST.get("message", "").strip()
+
+        if new_text == "":
+            return JsonResponse({"success": False, "error": "Empty message"}, status=400)
+
+        message.message = new_text
+        message.is_edited = True
+        message.edited_at = timezone.now()
+        message.save()
+
+        data = serialize_message(message)
+        data["event_type"] = "message_updated"
+
+        channel_layer = get_channel_layer()
+
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{room.id}",
+                {
+                    "type": "message_updated",
+                    "data": data,
+                }
+            )
+
+        return JsonResponse({"success": True, "message": data})
+
+    except ChatRoom.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Room not found"}, status=404)
+
+    except Message.DoesNotExist:
+        return JsonResponse({"success": False, "error": "Message not found"}, status=404)
+
+
+@login_required
+@require_POST
+def heartbeat_api(request):
+    profile, created = Profile.objects.get_or_create(user=request.user)
+
+    profile.is_online = True
+    profile.last_seen = timezone.now()
+    profile.save()
+
+    return JsonResponse({"success": True})
+
+
+@login_required
+@require_GET
+def user_status_api(request, user_id):
+    profile = Profile.objects.filter(user_id=user_id).first()
+
+    is_online = False
+    last_seen = None
+
+    if profile and profile.last_seen:
+        last_seen = timezone.localtime(profile.last_seen).strftime("%I:%M %p")
+
+        if profile.last_seen >= timezone.now() - timedelta(seconds=90):
+            is_online = True
+
+    return JsonResponse({
+        "success": True,
+        "is_online": is_online,
+        "last_seen": last_seen,
+    })
+
+
+
+# def chat_messages_api(request, room_id):
+#     try:
+#         room = ChatRoom.objects.get(id=room_id)
+
+#         if request.user.id not in [room.user1_id, room.user2_id]:
+#             return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
+
+#         after_id = request.GET.get("after_id", "0")
+
+#         try:
+#             after_id = int(after_id)
+#         except ValueError:
+#             after_id = 0
+
+#         messages = Message.objects.filter(
+#             room=room,
+#             id__gt=after_id
+#         ).select_related(
+#             "sender",
+#             "receiver",
+#             "room"
+#         ).order_by("created_at")
+
+#         # Receiver ke unread messages read mark kar do
+#         Message.objects.filter(
+#             room=room,
+#             receiver=request.user,
+#             is_read=False
+#         ).update(is_read=True)
+
+#         return JsonResponse({
+#             "success": True,
+#             "messages": [serialize_message(msg) for msg in messages]
+#         })
+
+#     except ChatRoom.DoesNotExist:
+#         return JsonResponse({"success": False, "error": "Room not found"}, status=404)
 
 
 

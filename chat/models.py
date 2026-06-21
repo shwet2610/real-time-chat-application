@@ -38,25 +38,25 @@ class ChatRoom(models.Model):
     def __str__(self):
         return f"{self.user1.username} - {self.user2.username}"
 
-
 class Message(models.Model):
-    room = models.ForeignKey(
-        ChatRoom,
-        on_delete=models.CASCADE,
-        related_name="messages"
+    room = models.ForeignKey(ChatRoom, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey(User, on_delete=models.CASCADE, related_name="sent_messages")
+    receiver = models.ForeignKey(User, on_delete=models.CASCADE, related_name="received_messages")
+
+    reply_to = models.ForeignKey(
+        "self",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="replies"
     )
-    sender = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="sent_messages"
-    )
-    receiver = models.ForeignKey(
-        User,
-        on_delete=models.CASCADE,
-        related_name="received_messages"
-    )
+
     message = models.TextField()
     is_read = models.BooleanField(default=False)
+
+    is_edited = models.BooleanField(default=False)
+    edited_at = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -64,3 +64,28 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.sender.username} to {self.receiver.username}: {self.message[:30]}"
+# class Message(models.Model):
+#     room = models.ForeignKey(
+#         ChatRoom,
+#         on_delete=models.CASCADE,
+#         related_name="messages"
+#     )
+#     sender = models.ForeignKey(
+#         User,
+#         on_delete=models.CASCADE,
+#         related_name="sent_messages"
+#     )
+#     receiver = models.ForeignKey(
+#         User,
+#         on_delete=models.CASCADE,
+#         related_name="received_messages"
+#     )
+#     message = models.TextField()
+#     is_read = models.BooleanField(default=False)
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     class Meta:
+#         ordering = ["created_at"]
+
+#     def __str__(self):
+#         return f"{self.sender.username} to {self.receiver.username}: {self.message[:30]}"

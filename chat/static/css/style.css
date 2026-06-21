@@ -336,7 +336,7 @@ main {
 .auth-card button,
 .main-btn,
 .search-box button,
-.chat-compose button,
+#sendBtn,
 .new-chat-btn {
     position: relative;
     border: none;
@@ -366,7 +366,7 @@ main {
 .auth-card button:hover,
 .main-btn:hover,
 .search-box button:hover,
-.chat-compose button:hover,
+#sendBtn:hover,
 .new-chat-btn:hover {
     background-position: 100% 50%;
     transform: translateY(-1px);
@@ -376,7 +376,7 @@ main {
 .auth-card button:active,
 .main-btn:active,
 .search-box button:active,
-.chat-compose button:active,
+#sendBtn:active,
 .new-chat-btn:active {
     transform: translateY(0);
     filter: brightness(0.95);
@@ -853,6 +853,16 @@ main {
     color: var(--text-tertiary);
     font-size: 12.5px;
     margin-top: 2px;
+    transition: color 0.15s ease;
+}
+
+.chat-panel-header p.online-text {
+    color: var(--online);
+    font-weight: 600;
+}
+
+.chat-panel-header p.offline-text {
+    color: var(--text-tertiary);
 }
 
 .chat-body {
@@ -919,14 +929,180 @@ main {
     opacity: 0.7;
 }
 
+/* ---- Reply quote (shown inside a bubble when a message replies to another) ---- */
+
+.reply-box {
+    background: rgba(255, 255, 255, 0.12);
+    border-left: 3px solid rgba(255, 255, 255, 0.55);
+    border-radius: 8px;
+    padding: 6px 10px;
+    margin-bottom: 7px;
+}
+
+.bubble .reply-box span {
+    display: block;
+    font-size: 11.5px;
+    font-weight: 700;
+    margin-bottom: 2px;
+    opacity: 0.95;
+}
+
+.bubble .reply-box p {
+    font-size: 12.5px;
+    line-height: 1.35;
+    opacity: 0.85;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.incoming .reply-box {
+    background: rgba(99, 102, 241, 0.1);
+    border-left-color: var(--brand-solid);
+}
+
+.incoming .reply-box span {
+    color: var(--brand-solid);
+}
+
+/* ---- Reply / Edit action row ---- */
+
+.message-actions {
+    display: flex;
+    gap: 6px;
+    margin-top: 7px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 255, 255, 0.18);
+}
+
+.incoming .message-actions {
+    border-top-color: var(--color-border);
+}
+
+.reply-btn,
+.edit-btn {
+    background: none;
+    border: none;
+    font-family: var(--font-body);
+    font-size: 11.5px;
+    font-weight: 600;
+    color: inherit;
+    opacity: 0.7;
+    cursor: pointer;
+    padding: 3px 7px;
+    border-radius: 6px;
+    transition: opacity 0.15s ease, background-color 0.15s ease, color 0.15s ease;
+}
+
+.reply-btn:hover,
+.edit-btn:hover {
+    opacity: 1;
+    background: rgba(255, 255, 255, 0.16);
+}
+
+.incoming .reply-btn:hover {
+    background: rgba(99, 102, 241, 0.12);
+    color: var(--brand-solid);
+}
+
+.incoming .edit-btn:hover {
+    background: rgba(251, 191, 36, 0.12);
+    color: #fbbf24;
+}
+
 .chat-compose {
-    height: 64px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-rows: auto auto;
+    column-gap: 10px;
+    row-gap: 0;
+    align-items: center;
+    min-height: 64px;
     padding: 10px 14px;
+    padding-bottom: calc(10px + var(--keyboard-offset, 0px));
     background: var(--color-surface);
     border-top: 1px solid var(--color-border);
-    display: flex;
-    gap: 10px;
     flex-shrink: 0;
+    transition: padding-bottom 0.15s ease;
+}
+
+#messageInput {
+    grid-column: 1;
+    grid-row: 2;
+}
+
+#sendBtn {
+    grid-column: 2;
+    grid-row: 2;
+}
+
+/* ---- Reply preview bar above the input ---- */
+
+.reply-preview {
+    grid-column: 1 / -1;
+    grid-row: 1;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+    padding: 8px 12px;
+    background: rgba(139, 92, 246, 0.1);
+    border: 1px solid rgba(139, 92, 246, 0.3);
+    border-left: 3px solid var(--brand-solid);
+    border-radius: var(--r-md);
+    animation: reply-preview-in 0.18s ease;
+}
+
+@keyframes reply-preview-in {
+    from { opacity: 0; transform: translateY(4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.reply-preview > div {
+    flex: 1;
+    min-width: 0;
+}
+
+#replySender {
+    display: block;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--brand-solid);
+    margin-bottom: 2px;
+}
+
+#replyText {
+    font-size: 12.5px;
+    color: var(--text-secondary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+#cancelReplyBtn {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--text-secondary);
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+#cancelReplyBtn:hover {
+    background: var(--danger-bg);
+    color: var(--danger);
+    transform: none;
+    box-shadow: none;
 }
 
 .chat-compose input {
@@ -953,7 +1129,16 @@ main {
     box-shadow: var(--shadow-focus);
 }
 
-.chat-compose button {
+#messageInput[placeholder="Edit your message..."] {
+    border-color: #fbbf24;
+    background: rgba(251, 191, 36, 0.08);
+}
+
+#messageInput[placeholder="Edit your message..."]:focus {
+    box-shadow: 0 0 0 4px rgba(251, 191, 36, 0.25);
+}
+
+#sendBtn {
     width: 78px;
     height: 44px;
 }
@@ -1040,177 +1225,148 @@ main {
         max-width: 82%;
     }
 }
-/* ===================== Mobile Chat Fix ===================== */
+/* ===================== Compact Reply/Edit UI Fix ===================== */
 
-@media (max-width: 850px) {
-    main {
-        min-height: calc(100dvh - 64px);
-    }
-
-    .chat-layout {
-        width: 100%;
-        height: calc(100dvh - 64px);
-        min-height: calc(100dvh - 64px);
-        margin: 0;
-        border-radius: 0;
-        grid-template-columns: 1fr;
-        overflow: hidden;
-    }
-
-    .chat-panel {
-        height: 100%;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .chat-panel-header {
-        height: 60px;
-        padding: 0 12px;
-        flex-shrink: 0;
-    }
-
-    .chat-body {
-        flex: 1;
-        min-height: 0;
-        overflow-y: auto;
-        padding: 14px 12px;
-    }
-
-    .chat-compose {
-        height: auto;
-        min-height: 62px;
-        padding: 8px 10px;
-        padding-bottom: calc(8px + env(safe-area-inset-bottom));
-        flex-shrink: 0;
-        position: sticky;
-        bottom: 0;
-        z-index: 20;
-    }
-
-    .chat-compose input {
-        height: 42px;
-        min-width: 0;
-    }
-
-    .chat-compose button {
-        width: 68px;
-        height: 42px;
-    }
-
-    .bubble {
-        max-width: 86%;
-    }
+/* Bubble ko compact rakho */
+.bubble {
+    position: relative;
+    padding: 8px 12px;
 }
 
+/* Message text compact */
+.bubble .message-text,
+.bubble p.message-text {
+    margin: 0;
+    font-size: 13.8px;
+    line-height: 1.42;
+}
 
-/* ===================== Mobile WhatsApp-style Chat Fix ===================== */
+/* Time compact */
+.bubble small {
+    margin-top: 3px;
+    font-size: 10px;
+}
 
+/* Reply quoted message ko chhota rakho */
+.reply-box {
+    padding: 5px 8px;
+    margin-bottom: 5px;
+    border-radius: 7px;
+    max-width: 100%;
+}
+
+.bubble .reply-box span {
+    font-size: 10.5px;
+    margin-bottom: 1px;
+}
+
+.bubble .reply-box p {
+    font-size: 11px;
+    line-height: 1.25;
+    max-height: 30px;
+    overflow: hidden;
+}
+
+/* Reply/Edit ko bubble ke andar height nahi lene dena */
+.message-actions {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    gap: 4px;
+
+    margin: 0;
+    padding: 3px;
+    border: none;
+
+    opacity: 0;
+    pointer-events: none;
+
+    background: rgba(10, 11, 20, 0.75);
+    backdrop-filter: blur(10px);
+    border-radius: 999px;
+    box-shadow: var(--shadow-sm);
+    z-index: 10;
+
+    transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+/* Outgoing message ke left side floating buttons */
+.outgoing .message-actions {
+    right: calc(100% + 6px);
+}
+
+/* Incoming message ke right side floating buttons */
+.incoming .message-actions {
+    left: calc(100% + 6px);
+}
+
+/* Hover par buttons show honge */
+.bubble:hover .message-actions,
+.bubble:focus-within .message-actions {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* Buttons ko small pill design */
+.reply-btn,
+.edit-btn {
+    background: rgba(255, 255, 255, 0.12);
+    border: none;
+    color: var(--text-primary);
+    font-size: 10.5px;
+    font-weight: 600;
+    padding: 4px 7px;
+    border-radius: 999px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.reply-btn:hover,
+.edit-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+}
+
+/* Mobile par hover nahi hota, isliye small inline chips but compact */
 @media (max-width: 850px) {
-    html,
-    body {
-        height: 100%;
-        overflow: hidden;
-    }
-
-    main {
-        height: calc(100dvh - 64px);
-        min-height: calc(100dvh - 64px);
-        overflow: hidden;
-    }
-
-    .chat-layout {
-        position: fixed;
-        top: 64px;
-        left: 0;
-        right: 0;
-        bottom: 0;
-
-        width: 100%;
-        height: auto;
-        min-height: 0;
-        margin: 0;
-
-        display: grid;
-        grid-template-columns: 1fr;
-
-        border-radius: 0;
-        border: none;
-        box-shadow: none;
-        overflow: hidden;
-    }
-
-    .chat-sidebar {
-        display: none;
-    }
-
-    .chat-panel {
-        height: 100%;
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-    }
-
-    .chat-panel-header {
-        height: 60px;
-        min-height: 60px;
-        padding: 0 12px;
-        flex-shrink: 0;
-
-        position: sticky;
-        top: 0;
-        z-index: 30;
-    }
-
-    .chat-panel-header .user-avatar.big {
-        width: 40px;
-        height: 40px;
-        min-width: 40px;
-        font-size: 14px;
-    }
-
-    .chat-panel-header h2 {
-        font-size: 16px;
-    }
-
-    .chat-panel-header p {
-        font-size: 11.5px;
-    }
-
-    .chat-body {
-        flex: 1;
-        min-height: 0;
-        overflow-y: auto;
-        padding: 14px 10px;
-        overscroll-behavior: contain;
-    }
-
-    .chat-compose {
-        min-height: 62px;
-        height: auto;
-        padding: 8px 10px;
-        padding-bottom: calc(8px + env(safe-area-inset-bottom));
-
-        flex-shrink: 0;
-        position: sticky;
-        bottom: 0;
-        z-index: 30;
-    }
-
-    .chat-compose input {
-        height: 42px;
-        min-width: 0;
-        font-size: 14px;
-    }
-
-    .chat-compose button {
-        width: 66px;
-        height: 42px;
-        font-size: 13px;
-    }
-
     .bubble {
-        max-width: 86%;
+        padding: 8px 11px;
+    }
+
+    .message-actions {
+        position: static;
+        transform: none;
+        opacity: 1;
+        pointer-events: auto;
+
+        display: flex;
+        justify-content: flex-end;
+        gap: 5px;
+
+        margin-top: 4px;
+        padding: 0;
+        background: transparent;
+        box-shadow: none;
+        backdrop-filter: none;
+    }
+
+    .reply-btn,
+    .edit-btn {
+        font-size: 10px;
+        padding: 2px 6px;
+        background: rgba(255, 255, 255, 0.10);
+        opacity: 0.75;
+    }
+
+    .reply-box {
+        padding: 4px 7px;
+        margin-bottom: 4px;
+    }
+
+    .bubble .reply-box p {
+    font-size: 10.5px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     }
 }

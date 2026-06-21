@@ -307,7 +307,17 @@ class UserActivityConsumer(AsyncWebsocketConsumer):
 
         await self.accept()
 
-        await self.set_online_status(True)
+        # await self.set_online_status(True)
+        await self.update_last_seen()
+
+    @database_sync_to_async
+    def update_last_seen(self):
+        profile, created = Profile.objects.get_or_create(user=self.user)
+        profile.last_seen = timezone.now()
+        profile.save()
+
+    async def message_updated(self, event):
+        await self.send(text_data=json.dumps(event["data"]))
 
     async def disconnect(self, close_code):
         if hasattr(self, "user") and self.user.is_authenticated:
