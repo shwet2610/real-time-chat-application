@@ -176,9 +176,6 @@
         scrollToBottom();
     }
 
-    // Important:
-    // Localhost par ws:// chalega
-    // Render live HTTPS par wss:// zaroori hai
     const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
 
     const chatSocket = new WebSocket(
@@ -223,13 +220,12 @@
             messageInput.focus();
         }
 
-        // Agar WebSocket fail hua to normal POST submit hoga,
-        // message DB me save ho jayega.
+        // Agar WebSocket connected nahi hai,
+        // to normal POST submit hoga aur reload ke saath DB me save hoga.
     });
 
     window.addEventListener("load", scrollToBottom);
 </script>
-
 
 {% endblock %}
 
