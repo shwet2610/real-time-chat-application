@@ -122,6 +122,7 @@
             <input 
                 type="text" 
                 id="messageInput"
+                name="message"
                 placeholder="Type your message here..."
                 autocomplete="off"
                 required
@@ -136,6 +137,105 @@
 </div>
 
 <script>
+    const roomId = "{{ room.id }}";
+    const currentUserId = Number("{{ request.user.id }}");
+
+    const chatMessages = document.getElementById("chatMessages");
+    const chatForm = document.getElementById("chatForm");
+    const messageInput = document.getElementById("messageInput");
+
+    function scrollToBottom() {
+        if (chatMessages) {
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+    }
+
+    function addMessageToScreen(data) {
+        if (!chatMessages) return;
+
+        const senderId = Number(data.sender_id);
+        const isOutgoing = senderId === currentUserId;
+
+        const row = document.createElement("div");
+        row.className = isOutgoing ? "bubble-row outgoing" : "bubble-row incoming";
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+
+        const messageText = document.createElement("p");
+        messageText.textContent = data.message;
+
+        const time = document.createElement("small");
+        time.textContent = data.created_at || "";
+
+        bubble.appendChild(messageText);
+        bubble.appendChild(time);
+        row.appendChild(bubble);
+
+        chatMessages.appendChild(row);
+        scrollToBottom();
+    }
+
+    // Important:
+    // Localhost par ws:// chalega
+    // Render live HTTPS par wss:// zaroori hai
+    const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+
+    const chatSocket = new WebSocket(
+        wsProtocol + window.location.host + "/ws/chat/" + roomId + "/"
+    );
+
+    chatSocket.onopen = function () {
+        console.log("Chat WebSocket connected");
+        scrollToBottom();
+    };
+
+    chatSocket.onmessage = function (event) {
+        const data = JSON.parse(event.data);
+        console.log("Message received:", data);
+        addMessageToScreen(data);
+    };
+
+    chatSocket.onerror = function (error) {
+        console.log("Chat WebSocket error:", error);
+    };
+
+    chatSocket.onclose = function (event) {
+        console.log("Chat WebSocket closed:", event);
+    };
+
+    chatForm.addEventListener("submit", function (event) {
+        const message = messageInput.value.trim();
+
+        if (message === "") {
+            event.preventDefault();
+            return;
+        }
+
+        if (chatSocket.readyState === WebSocket.OPEN) {
+            event.preventDefault();
+
+            chatSocket.send(JSON.stringify({
+                "message": message
+            }));
+
+            messageInput.value = "";
+            messageInput.focus();
+        }
+
+        // Agar WebSocket fail hua to normal POST submit hoga,
+        // message DB me save ho jayega.
+    });
+
+    window.addEventListener("load", scrollToBottom);
+</script>
+
+
+{% endblock %}
+
+
+
+{% comment %} <script>
     const roomId = "{{ room.id }}";
     const currentUserId = "{{ request.user.id }}";
 
@@ -212,4 +312,4 @@
         messageInput.focus();
     });
 </script>
-{% endblock %}
+{% endblock %} {% endcomment %}
