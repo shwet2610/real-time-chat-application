@@ -88,8 +88,28 @@
 </p>
             </div>
         </div>
-
         <div class="chat-body" id="chatMessages">
+    {% if messages_list %}
+        {% for msg in messages_list %}
+            <div 
+                class="bubble-row {% if msg.sender == request.user %}outgoing{% else %}incoming{% endif %}"
+                data-message-id="{{ msg.id }}"
+            >
+                <div class="bubble">
+                    <p>{{ msg.message }}</p>
+                    <small>{{ msg.created_at|date:"h:i A" }}</small>
+                </div>
+            </div>
+        {% endfor %}
+    {% else %}
+        <div class="empty-chat">
+            <div class="empty-icon">💬</div>
+            <h3>No messages yet</h3>
+            <p>Start the conversation by sending a message.</p>
+        </div>
+    {% endif %}
+</div>
+        {% comment %} <div class="chat-body" id="chatMessages">
             {% if messages_list %}
                 {% for msg in messages_list %}
                     {% if msg.sender == request.user %}
@@ -115,7 +135,7 @@
                     <p>Send your first message to {{ other_user.username }}</p>
                 </div>
             {% endif %}
-        </div>
+        </div> {% endcomment %}
 
         <form class="chat-compose" id="chatForm"  method="POST">
              {% csrf_token %}
@@ -140,9 +160,42 @@
     const roomId = "{{ room.id }}";
     const currentUserId = Number("{{ request.user.id }}");
 
+    const sendMessageUrl = "{% url 'send_message_api' room.id %}";
+    const getMessagesUrl = "{% url 'chat_messages_api' room.id %}";
+
     const chatMessages = document.getElementById("chatMessages");
     const chatForm = document.getElementById("chatForm");
     const messageInput = document.getElementById("messageInput");
+
+    let lastMessageId = 0;
+
+    document.querySelectorAll("[data-message-id]").forEach(function (item) {
+        const messageId = Number(item.dataset.messageId);
+        if (messageId > lastMessageId) {
+            lastMessageId = messageId;
+        }
+    });
+
+    function getCookie(name) {
+        let cookieValue = null;
+
+        if (document.cookie && document.cookie !== "") {
+            const cookies = document.cookie.split(";");
+
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+
+                if (cookie.substring(0, name.length + 1) === (name + "=")) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+
+        return cookieValue;
+    }
+
+    const csrftoken = getCookie("csrftoken");
 
     function scrollToBottom() {
         if (chatMessages) {
@@ -153,11 +206,18 @@
     function addMessageToScreen(data) {
         if (!chatMessages) return;
 
+        const messageId = Number(data.id || data.message_id);
+
+        if (document.querySelector(`[data-message-id="${messageId}"]`)) {
+            return;
+        }
+
         const senderId = Number(data.sender_id);
         const isOutgoing = senderId === currentUserId;
 
         const row = document.createElement("div");
         row.className = isOutgoing ? "bubble-row outgoing" : "bubble-row incoming";
+        row.dataset.messageId = messageId;
 
         const bubble = document.createElement("div");
         bubble.className = "bubble";
@@ -173,60 +233,106 @@
         row.appendChild(bubble);
 
         chatMessages.appendChild(row);
+
+        if (messageId > lastMessageId) {
+            lastMessageId = messageId;
+        }
+
         scrollToBottom();
     }
 
-    const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+    async function sendMessageByApi(message) {
+        const formData = new FormData();
+        formData.append("message", message);
 
-    const chatSocket = new WebSocket(
-        wsProtocol + window.location.host + "/ws/chat/" + roomId + "/"
-    );
+        const response = await fetch(sendMessageUrl, {
+            method: "POST",
+            headers: {
+                "X-CSRFToken": csrftoken
+            },
+            body: formData
+        });
 
-    chatSocket.onopen = function () {
-        console.log("Chat WebSocket connected");
-        scrollToBottom();
-    };
+        const data = await response.json();
 
-    chatSocket.onmessage = function (event) {
-        const data = JSON.parse(event.data);
-        console.log("Message received:", data);
-        addMessageToScreen(data);
-    };
+        if (data.success) {
+            addMessageToScreen(data.message);
+            return true;
+        }
 
-    chatSocket.onerror = function (error) {
-        console.log("Chat WebSocket error:", error);
-    };
+        console.log("Send message failed:", data);
+        return false;
+    }
 
-    chatSocket.onclose = function (event) {
-        console.log("Chat WebSocket closed:", event);
-    };
+    async function fetchNewMessages() {
+        try {
+            const response = await fetch(getMessagesUrl + "?after_id=" + lastMessageId);
+            const data = await response.json();
 
-    chatForm.addEventListener("submit", function (event) {
+            if (data.success) {
+                data.messages.forEach(function (message) {
+                    addMessageToScreen(message);
+                });
+            }
+        } catch (error) {
+            console.log("Polling error:", error);
+        }
+    }
+
+    // WebSocket only for instant receiving
+    try {
+        const wsProtocol = window.location.protocol === "https:" ? "wss://" : "ws://";
+
+        const chatSocket = new WebSocket(
+            wsProtocol + window.location.host + "/ws/chat/" + roomId + "/"
+        );
+
+        chatSocket.onopen = function () {
+            console.log("Chat WebSocket connected");
+        };
+
+        chatSocket.onmessage = function (event) {
+            const data = JSON.parse(event.data);
+            addMessageToScreen(data);
+        };
+
+        chatSocket.onerror = function (error) {
+            console.log("Chat WebSocket error:", error);
+        };
+
+        chatSocket.onclose = function () {
+            console.log("Chat WebSocket closed. Polling fallback is active.");
+        };
+    } catch (error) {
+        console.log("WebSocket setup failed. Polling fallback is active.", error);
+    }
+
+    chatForm.addEventListener("submit", async function (event) {
+        event.preventDefault();
+
         const message = messageInput.value.trim();
 
         if (message === "") {
-            event.preventDefault();
             return;
         }
 
-        if (chatSocket.readyState === WebSocket.OPEN) {
-            event.preventDefault();
+        messageInput.value = "";
 
-            chatSocket.send(JSON.stringify({
-                "message": message
-            }));
+        const sent = await sendMessageByApi(message);
 
-            messageInput.value = "";
-            messageInput.focus();
+        if (!sent) {
+            messageInput.value = message;
+            alert("Message send nahi hua. Please try again.");
         }
 
-        // Agar WebSocket connected nahi hai,
-        // to normal POST submit hoga aur reload ke saath DB me save hoga.
+        messageInput.focus();
     });
 
-    window.addEventListener("load", scrollToBottom);
-</script>
+    scrollToBottom();
 
+    // Backup live update: agar WebSocket fail hua tab bhi receiver ko message mil jayega
+    setInterval(fetchNewMessages, 1200);
+</script>
 {% endblock %}
 
 

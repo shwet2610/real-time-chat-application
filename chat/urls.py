@@ -11,4 +11,6 @@ urlpatterns = [
     path("users/", views.users_view, name="users"),
     path("start-chat/<int:user_id>/", views.start_chat_view, name="start_chat"),
     path("chat/<int:room_id>/", views.chat_room_view, name="chat_room"),
+    path("chat/<int:room_id>/send/", views.send_message_api, name="send_message_api"),
+    path("chat/<int:room_id>/messages/", views.chat_messages_api, name="chat_messages_api"),
 ]
