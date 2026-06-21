@@ -248,6 +248,7 @@
 
     let lastMessageId = 0;
     let editModeMessageId = null;
+    let isSendingMessage = false;
 
     document.querySelectorAll("[data-message-id]").forEach(function (item) {
         const messageId = Number(item.dataset.messageId);
@@ -256,6 +257,13 @@
             lastMessageId = messageId;
         }
     });
+
+    function setMobileAppHeight() {
+        if (window.innerWidth <= 850) {
+            const height = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+            document.documentElement.style.setProperty("--app-height", height + "px");
+        }
+    }
 
     function getCookie(name) {
         let cookieValue = null;
@@ -279,12 +287,43 @@
     const csrftoken = getCookie("csrftoken");
 
     function scrollToBottom() {
-        if (chatMessages) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+        if (!chatMessages) return;
+
+        chatMessages.scrollTo({
+            top: chatMessages.scrollHeight,
+            behavior: "smooth"
+        });
+    }
+
+    function instantScrollToBottom() {
+        if (!chatMessages) return;
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    function focusMessageInput() {
+        if (!messageInput) return;
+
+        requestAnimationFrame(function () {
+            try {
+                messageInput.focus({ preventScroll: true });
+            } catch (error) {
+                messageInput.focus();
+            }
+        });
+    }
+
+    function afterMessageAction() {
+        setMobileAppHeight();
+
+        requestAnimationFrame(function () {
+            scrollToBottom();
+            focusMessageInput();
+        });
     }
 
     function clearReply() {
+        if (!replyToInput || !replyPreview || !replySender || !replyText) return;
+
         replyToInput.value = "";
         replyPreview.style.display = "none";
         replySender.textContent = "";
@@ -293,19 +332,14 @@
 
     function clearEditMode() {
         editModeMessageId = null;
-        sendBtn.textContent = "Send";
-        messageInput.placeholder = "Type your message...";
-    }
 
-    function createReplyBox(replyData) {
-        if (!replyData) return "";
+        if (sendBtn) {
+            sendBtn.textContent = "Send";
+        }
 
-        return `
-            <div class="reply-box">
-                <span>${replyData.sender_username}</span>
-                <p>${replyData.message}</p>
-            </div>
-        `;
+        if (messageInput) {
+            messageInput.placeholder = "Type your message...";
+        }
     }
 
     function addMessageToScreen(data) {
@@ -393,7 +427,7 @@
             lastMessageId = messageId;
         }
 
-        scrollToBottom();
+        afterMessageAction();
     }
 
     function updateMessageOnScreen(data) {
@@ -405,6 +439,7 @@
         const messageText = row.querySelector(".message-text");
         const small = row.querySelector("small");
         const editBtn = row.querySelector(".edit-btn");
+        const replyBtn = row.querySelector(".reply-btn");
 
         if (messageText) {
             messageText.textContent = data.message;
@@ -417,13 +452,17 @@
         if (editBtn) {
             editBtn.dataset.messageText = data.message;
         }
+
+        if (replyBtn) {
+            replyBtn.dataset.messageText = data.message;
+        }
     }
 
     async function sendMessageByApi(message) {
         const formData = new FormData();
         formData.append("message", message);
 
-        if (replyToInput.value) {
+        if (replyToInput && replyToInput.value) {
             formData.append("reply_to_id", replyToInput.value);
         }
 
@@ -552,45 +591,81 @@
         console.log("WebSocket setup failed. Polling fallback is active.", error);
     }
 
-    chatMessages.addEventListener("click", function (event) {
-        const replyBtn = event.target.closest(".reply-btn");
-        const editBtn = event.target.closest(".edit-btn");
+    if (chatMessages) {
+        chatMessages.addEventListener("click", function (event) {
+            const replyBtn = event.target.closest(".reply-btn");
+            const editBtn = event.target.closest(".edit-btn");
 
-        if (replyBtn) {
-            clearEditMode();
+            if (replyBtn) {
+                clearEditMode();
 
-            replyToInput.value = replyBtn.dataset.messageId;
-            replySender.textContent = replyBtn.dataset.sender;
-            replyText.textContent = replyBtn.dataset.messageText;
-            replyPreview.style.display = "flex";
+                replyToInput.value = replyBtn.dataset.messageId;
+                replySender.textContent = replyBtn.dataset.sender;
+                replyText.textContent = replyBtn.dataset.messageText;
+                replyPreview.style.display = "flex";
 
-            messageInput.focus();
-        }
+                focusMessageInput();
+                setTimeout(scrollToBottom, 80);
+            }
 
-        if (editBtn) {
+            if (editBtn) {
+                clearReply();
+
+                editModeMessageId = editBtn.dataset.messageId;
+                messageInput.value = editBtn.dataset.messageText;
+                sendBtn.textContent = "Save";
+                messageInput.placeholder = "Edit your message...";
+
+                focusMessageInput();
+                setTimeout(scrollToBottom, 80);
+            }
+        });
+    }
+
+    if (cancelReplyBtn) {
+        cancelReplyBtn.addEventListener("click", function () {
             clearReply();
+            focusMessageInput();
+        });
+    }
 
-            editModeMessageId = editBtn.dataset.messageId;
-            messageInput.value = editBtn.dataset.messageText;
-            sendBtn.textContent = "Save";
-            messageInput.placeholder = "Edit your message...";
+    if (sendBtn) {
+        sendBtn.addEventListener("mousedown", function (event) {
+            event.preventDefault();
+        });
 
-            messageInput.focus();
-        }
-    });
+        sendBtn.addEventListener("touchstart", function (event) {
+            event.preventDefault();
 
-    cancelReplyBtn.addEventListener("click", function () {
-        clearReply();
-        messageInput.focus();
-    });
+            if (chatForm.requestSubmit) {
+                chatForm.requestSubmit();
+            } else {
+                chatForm.dispatchEvent(new Event("submit", {
+                    cancelable: true,
+                    bubbles: true
+                }));
+            }
+        }, { passive: false });
+    }
 
     chatForm.addEventListener("submit", async function (event) {
         event.preventDefault();
 
+        if (isSendingMessage) {
+            return;
+        }
+
         const message = messageInput.value.trim();
 
         if (message === "") {
+            focusMessageInput();
             return;
+        }
+
+        isSendingMessage = true;
+
+        if (sendBtn) {
+            sendBtn.disabled = true;
         }
 
         messageInput.value = "";
@@ -604,7 +679,15 @@
             }
 
             clearEditMode();
-            messageInput.focus();
+
+            isSendingMessage = false;
+
+            if (sendBtn) {
+                sendBtn.disabled = false;
+            }
+
+            focusMessageInput();
+            afterMessageAction();
             return;
         }
 
@@ -616,24 +699,30 @@
         }
 
         clearReply();
-        messageInput.focus();
+
+        isSendingMessage = false;
+
+        if (sendBtn) {
+            sendBtn.disabled = false;
+        }
+
+        focusMessageInput();
+        afterMessageAction();
     });
 
-    function handleMobileKeyboard() {
-        if (!window.visualViewport) return;
-
-        const offset = Math.max(0, window.innerHeight - window.visualViewport.height - window.visualViewport.offsetTop);
-        document.documentElement.style.setProperty("--keyboard-offset", offset + "px");
-
-        setTimeout(scrollToBottom, 100);
-    }
+    setMobileAppHeight();
+    window.addEventListener("resize", setMobileAppHeight);
 
     if (window.visualViewport) {
-        window.visualViewport.addEventListener("resize", handleMobileKeyboard);
-        window.visualViewport.addEventListener("scroll", handleMobileKeyboard);
+        window.visualViewport.addEventListener("resize", function () {
+            setMobileAppHeight();
+            setTimeout(instantScrollToBottom, 80);
+        });
+
+        window.visualViewport.addEventListener("scroll", setMobileAppHeight);
     }
 
-    scrollToBottom();
+    instantScrollToBottom();
     sendHeartbeat();
     fetchUserStatus();
 
