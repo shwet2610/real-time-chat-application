@@ -9,6 +9,239 @@
         <a href="{% url 'users' %}" class="main-btn small-btn">Find User</a>
     </div>
 
+    <div class="chat-list-card" id="chatListCard">
+        {% if chatrooms %}
+            {% for room in chatrooms %}
+                <a href="{% url 'chat_room' room.id %}" class="chat-list-item" data-room-id="{{ room.id }}">
+                    <div class="avatar-holder">
+                        <div class="user-avatar">
+                            {{ room.other_user.username|first|upper }}
+                        </div>
+
+                        <span 
+                            class="status-dot {% if room.other_user.profile.is_online %}online{% else %}offline{% endif %}"
+                            data-status-user-id="{{ room.other_user.id }}">
+                        </span>
+                    </div>
+
+                    <div class="chat-info">
+                        <div class="chat-title-row">
+                            <h3>{{ room.other_user.username }}</h3>
+
+                            <span class="chat-time" data-last-time>
+                                {% if room.last_message %}
+                                    {{ room.last_message.created_at|date:"h:i A" }}
+                                {% else %}
+                                    {{ room.updated_at|date:"h:i A" }}
+                                {% endif %}
+                            </span>
+                        </div>
+
+                        <div class="chat-preview-row">
+                            <p data-last-message>
+                                {% if room.last_message %}
+                                    {% if room.last_message.sender == request.user %}
+                                        You:
+                                    {% endif %}
+                                    {{ room.last_message.message|truncatechars:45 }}
+                                {% else %}
+                                    No messages yet
+                                {% endif %}
+                            </p>
+
+                            <span 
+                                class="unread-badge"
+                                data-unread-badge
+                                {% if room.unread_count == 0 %}style="display: none;"{% endif %}>
+                                {% if room.unread_count > 0 %}
+                                    {{ room.unread_count }}
+                                {% endif %}
+                            </span>
+                        </div>
+                    </div>
+                </a>
+            {% endfor %}
+        {% else %}
+            <div class="empty-box">
+                <h2>No chats yet</h2>
+                <p>Search a user and start your first conversation.</p>
+                <a href="{% url 'users' %}" class="main-btn">Start New Chat</a>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+
+<script>
+    const chatListCard = document.getElementById("chatListCard");
+    const chatListApiUrl = "{% url 'chat_list_api' %}";
+    const heartbeatUrl = "{% url 'heartbeat_api' %}";
+    const currentUserId = Number("{{ request.user.id }}");
+
+    function getCookie(name) {
+        let cookieValue = null;
+
+        if (document.cookie && document.cookie !== "") {
+            const cookies = document.cookie.split(";");
+
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+
+                if (cookie.substring(0, name.length + 1) === (name + "=")) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+
+        return cookieValue;
+    }
+
+    const csrftoken = getCookie("csrftoken");
+
+    async function sendHeartbeat() {
+        try {
+            await fetch(heartbeatUrl, {
+                method: "POST",
+                headers: {
+                    "X-CSRFToken": csrftoken
+                }
+            });
+        } catch (error) {
+            console.log("Heartbeat error:", error);
+        }
+    }
+
+    function createChatItem(room) {
+        const link = document.createElement("a");
+        link.href = room.chat_url;
+        link.className = "chat-list-item";
+        link.dataset.roomId = room.room_id;
+
+        const avatarHolder = document.createElement("div");
+        avatarHolder.className = "avatar-holder";
+
+        const avatar = document.createElement("div");
+        avatar.className = "user-avatar";
+        avatar.textContent = room.avatar || room.other_username.charAt(0).toUpperCase();
+
+        const statusDot = document.createElement("span");
+        statusDot.className = room.is_online ? "status-dot online" : "status-dot offline";
+        statusDot.dataset.statusUserId = room.other_user_id;
+
+        avatarHolder.appendChild(avatar);
+        avatarHolder.appendChild(statusDot);
+
+        const chatInfo = document.createElement("div");
+        chatInfo.className = "chat-info";
+
+        const titleRow = document.createElement("div");
+        titleRow.className = "chat-title-row";
+
+        const username = document.createElement("h3");
+        username.textContent = room.other_username;
+
+        const time = document.createElement("span");
+        time.className = "chat-time";
+        time.dataset.lastTime = "";
+        time.textContent = room.last_time || "";
+
+        titleRow.appendChild(username);
+        titleRow.appendChild(time);
+
+        const previewRow = document.createElement("div");
+        previewRow.className = "chat-preview-row";
+
+        const lastMessage = document.createElement("p");
+        lastMessage.dataset.lastMessage = "";
+
+        let messageText = room.last_message || "No messages yet";
+
+        if (room.last_sender_id && Number(room.last_sender_id) === currentUserId) {
+            messageText = "You: " + messageText;
+        }
+
+        if (messageText.length > 45) {
+            messageText = messageText.substring(0, 45) + "...";
+        }
+
+        lastMessage.textContent = messageText;
+
+        previewRow.appendChild(lastMessage);
+
+        const unread = document.createElement("span");
+        unread.className = "unread-badge";
+        unread.dataset.unreadBadge = "";
+
+        if (room.unread_count && room.unread_count > 0) {
+            unread.textContent = room.unread_count;
+            unread.style.display = "inline-flex";
+        } else {
+            unread.textContent = "";
+            unread.style.display = "none";
+        }
+
+        previewRow.appendChild(unread);
+
+        chatInfo.appendChild(titleRow);
+        chatInfo.appendChild(previewRow);
+
+        link.appendChild(avatarHolder);
+        link.appendChild(chatInfo);
+
+        return link;
+    }
+
+    async function loadChatList() {
+        try {
+            const response = await fetch(chatListApiUrl);
+            const data = await response.json();
+
+            if (!data.success || !chatListCard) {
+                return;
+            }
+
+            chatListCard.innerHTML = "";
+
+            if (data.rooms.length === 0) {
+                chatListCard.innerHTML = `
+                    <div class="empty-box">
+                        <h2>No chats yet</h2>
+                        <p>Search a user and start your first conversation.</p>
+                        <a href="{% url 'users' %}" class="main-btn">Start New Chat</a>
+                    </div>
+                `;
+                return;
+            }
+
+            data.rooms.forEach(function (room) {
+                chatListCard.appendChild(createChatItem(room));
+            });
+        } catch (error) {
+            console.log("Chat list update error:", error);
+        }
+    }
+
+    sendHeartbeat();
+    loadChatList();
+
+    setInterval(sendHeartbeat, 10000);
+    setInterval(loadChatList, 2000);
+</script>
+{% endblock %}
+
+
+{% comment %} {% extends 'chat/base.html' %}
+
+{% block content %}
+<div class="dashboard-container">
+
+    <div class="dashboard-header">
+        <h1>Your Chats</h1>
+        <p>Continue your conversations or start a new private chat.</p>
+        <a href="{% url 'users' %}" class="main-btn small-btn">Find User</a>
+    </div>
+
     <div class="chat-list-card">
         {% if chatrooms %}
             {% for room in chatrooms %}
@@ -72,4 +305,4 @@
     </div>
 
 </div>
-{% endblock %}
+{% endblock %} {% endcomment %}

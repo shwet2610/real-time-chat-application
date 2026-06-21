@@ -15,7 +15,7 @@ urlpatterns = [
 
     path("chat/<int:room_id>/send/", views.send_message_api, name="send_message_api"),
     path("chat/<int:room_id>/messages/", views.chat_messages_api, name="chat_messages_api"),
-
+    path("api/chats/", views.chat_list_api, name="chat_list_api"),
     # path("chat/<int:room_id>/send/", views.send_message_api, name="send_message_api"),
     # path("chat/<int:room_id>/messages/", views.chat_messages_api, name="chat_messages_api"),
     path("chat/<int:room_id>/edit/<int:message_id>/", views.edit_message_api, name="edit_message_api"),

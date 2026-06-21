@@ -4,7 +4,7 @@ from django.contrib.auth import authenticate, login, logout
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q
-
+from datetime import timedelta
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
 from django.utils import timezone
@@ -486,7 +486,60 @@ def user_status_api(request, user_id):
         "last_seen": last_seen,
     })
 
+@login_required
+def chat_list_api(request):
+    chatrooms = ChatRoom.objects.filter(
+        user1=request.user
+    ) | ChatRoom.objects.filter(
+        user2=request.user
+    )
 
+    chatrooms = chatrooms.select_related(
+        "user1",
+        "user2",
+        "user1__profile",
+        "user2__profile"
+    ).order_by("-updated_at")
+
+    rooms_data = []
+
+    for room in chatrooms:
+        if room.user1 == request.user:
+            other_user = room.user2
+        else:
+            other_user = room.user1
+
+        last_message = room.messages.order_by("-created_at").first()
+
+        unread_count = Message.objects.filter(
+            room=room,
+            receiver=request.user,
+            is_read=False
+        ).count()
+
+        is_online = False
+
+        if hasattr(other_user, "profile") and other_user.profile.last_seen:
+            if other_user.profile.last_seen >= timezone.now() - timedelta(seconds=90):
+                is_online = True
+
+        rooms_data.append({
+            "room_id": room.id,
+            "other_user_id": other_user.id,
+            "other_username": other_user.username,
+            "avatar": other_user.username[:1].upper(),
+            "is_online": is_online,
+            "last_message": last_message.message if last_message else "No messages yet",
+            "last_sender_id": last_message.sender.id if last_message else None,
+            "last_time": timezone.localtime(last_message.created_at).strftime("%I:%M %p") if last_message else "",
+            "unread_count": unread_count,
+            "chat_url": f"/chat/{room.id}/",
+        })
+
+    return JsonResponse({
+        "success": True,
+        "rooms": rooms_data,
+    })
 
 # def chat_messages_api(request, room_id):
 #     try:
