@@ -15,35 +15,168 @@ from .models import ChatRoom, Message, Profile
 
 
 
+# def prepare_chatrooms(chatrooms, current_user):
+#     """
+#     Har chatroom ke saath extra data attach karega:
+#     - other_user
+#     - last_message
+#     - unread_count
+
+#     Important:
+#     Unread count sirf current_user ke received unread messages ka hoga.
+#     """
+#     for room in chatrooms:
+#         if room.user1_id == current_user.id:
+#             room.other_user = room.user2
+#         else:
+#             room.other_user = room.user1
+
+#         room.last_message = Message.objects.filter(
+#             room=room
+#         ).select_related("sender", "receiver").order_by("-created_at").first()
+
+#         room.unread_count = Message.objects.filter(
+#             room=room,
+#             receiver_id=current_user.id,
+#             is_read=False
+#         ).exclude(
+#             sender_id=current_user.id
+#         ).count()
+
+#     return chatrooms
+
+def is_user_online(user):
+    profile = Profile.objects.filter(user=user).first()
+
+    if not profile or not profile.last_seen:
+        return False
+
+    return profile.last_seen >= timezone.now() - timedelta(seconds=90)
+
+
+def get_message_status(message, current_user):
+    if message.sender != current_user:
+        return ""
+
+    if message.seen_at:
+        return "Seen"
+
+    if message.delivered_at:
+        return "Delivered"
+
+    return "Sent"
+
+
+def get_message_text_for_user(message, current_user):
+    if message.deleted_for_everyone:
+        return "This message was deleted"
+
+    return message.message
+
+
+def serialize_message(message, current_user=None):
+    local_time = timezone.localtime(message.created_at)
+
+    reply_data = None
+
+    if message.reply_to:
+        reply_data = {
+            "id": message.reply_to.id,
+            "message": get_message_text_for_user(message.reply_to, current_user),
+            "sender_username": message.reply_to.sender.username,
+        }
+
+    status_text = ""
+
+    if current_user:
+        status_text = get_message_status(message, current_user)
+
+    return {
+        "id": message.id,
+        "message_id": message.id,
+        "room_id": message.room.id,
+
+        "message": get_message_text_for_user(message, current_user),
+        "original_message": message.message,
+
+        "sender_id": message.sender.id,
+        "receiver_id": message.receiver.id,
+        "sender_username": message.sender.username,
+        "receiver_username": message.receiver.username,
+
+        "created_at": local_time.strftime("%I:%M %p"),
+
+        "is_edited": message.is_edited,
+        "is_deleted_for_everyone": message.deleted_for_everyone,
+
+        "delivered_at": timezone.localtime(message.delivered_at).strftime("%I:%M %p") if message.delivered_at else "",
+        "seen_at": timezone.localtime(message.seen_at).strftime("%I:%M %p") if message.seen_at else "",
+        "status_text": status_text,
+
+        "reply_to": reply_data,
+    }
+
+# def prepare_chatrooms(chatrooms, current_user):
+#     prepared_rooms = []
+
+#     for room in chatrooms:
+#         if room.user1 == current_user:
+#             other_user = room.user2
+#         else:
+#             other_user = room.user1
+
+#         room.other_user = other_user
+
+#         room.last_message = room.messages.order_by("-created_at").first()
+
+#         room.unread_count = Message.objects.filter(
+#             room=room,
+#             receiver=current_user,
+#             is_read=False
+#         ).count()
+
+#         # Correct online logic: last 90 seconds heartbeat = online
+#         room.other_user_is_online = False
+
+#         if hasattr(other_user, "profile") and other_user.profile.last_seen:
+#             if other_user.profile.last_seen >= timezone.now() - timedelta(seconds=90):
+#                 room.other_user_is_online = True
+
+#         prepared_rooms.append(room)
+
+#     return prepared_rooms
+
+
 def prepare_chatrooms(chatrooms, current_user):
-    """
-    Har chatroom ke saath extra data attach karega:
-    - other_user
-    - last_message
-    - unread_count
+    prepared_rooms = []
 
-    Important:
-    Unread count sirf current_user ke received unread messages ka hoga.
-    """
     for room in chatrooms:
-        if room.user1_id == current_user.id:
-            room.other_user = room.user2
+        if room.user1 == current_user:
+            other_user = room.user2
         else:
-            room.other_user = room.user1
+            other_user = room.user1
 
-        room.last_message = Message.objects.filter(
-            room=room
-        ).select_related("sender", "receiver").order_by("-created_at").first()
+        room.other_user = other_user
+
+        room.last_message = room.messages.exclude(
+            deleted_for=current_user
+        ).order_by("-created_at").first()
 
         room.unread_count = Message.objects.filter(
             room=room,
-            receiver_id=current_user.id,
-            is_read=False
+            receiver=current_user,
+            is_read=False,
+            deleted_for_everyone=False
         ).exclude(
-            sender_id=current_user.id
+            deleted_for=current_user
         ).count()
 
-    return chatrooms
+        room.other_user_is_online = is_user_online(other_user)
+
+        prepared_rooms.append(room)
+
+    return prepared_rooms
+
 
 def register_view(request):
     if request.method == "POST":
@@ -158,8 +291,8 @@ def chat_room_view(request, room_id):
         id=room_id
     )
 
-    if request.user != room.user1 and request.user != room.user2:
-        messages.error(request, "You are not allowed to access this chat.")
+    if request.user.id not in [room.user1_id, room.user2_id]:
+        messages.error(request, "You are not allowed to open this chat.")
         return redirect("home")
 
     if request.user == room.user1:
@@ -167,89 +300,60 @@ def chat_room_view(request, room_id):
     else:
         other_user = room.user1
 
-    # Chat open hote hi received unread messages read ho jayenge
+    other_user_is_online = is_user_online(other_user)
+
+    chatrooms_query = ChatRoom.objects.filter(
+        user1=request.user
+    ) | ChatRoom.objects.filter(
+        user2=request.user
+    )
+
+    chatrooms_query = chatrooms_query.select_related(
+        "user1",
+        "user2",
+        "user1__profile",
+        "user2__profile"
+    ).order_by("-updated_at")
+
+    chatrooms = prepare_chatrooms(chatrooms_query, request.user)
+
+    now_time = timezone.now()
+
     Message.objects.filter(
-    room=room,
-    receiver_id=request.user.id,
-    is_read=False
-     ).exclude(
-    sender_id=request.user.id
-     ).update(is_read=True)
-
-    # Normal POST fallback. Agar JavaScript disable ho, tab bhi message save hoga.
-    if request.method == "POST":
-        message_text = request.POST.get("message", "").strip()
-
-        if message_text:
-            Message.objects.create(
-                room=room,
-                sender=request.user,
-                receiver=other_user,
-                message=message_text
-            )
-
-            room.save()
-            return redirect("chat_room", room_id=room.id)
+        room=room,
+        receiver=request.user,
+        delivered_at__isnull=True,
+        deleted_for_everyone=False
+    ).exclude(
+        deleted_for=request.user
+    ).update(
+        delivered_at=now_time
+    )
 
     messages_list = Message.objects.filter(
         room=room
-    ).select_related("sender", "receiver").order_by("created_at")
+    ).exclude(
+        deleted_for=request.user
+    ).select_related(
+        "sender",
+        "receiver",
+        "room",
+        "reply_to",
+        "reply_to__sender"
+    ).order_by("created_at")
 
-    chatrooms = ChatRoom.objects.filter(
-        Q(user1=request.user) | Q(user2=request.user)
-    ).select_related("user1", "user2").order_by("-updated_at")
-
-    chatrooms = prepare_chatrooms(chatrooms, request.user)
+    for msg in messages_list:
+        msg.display_message = get_message_text_for_user(msg, request.user)
+        msg.status_text = get_message_status(msg, request.user)
 
     return render(request, "chat/chat_room.html", {
         "room": room,
         "other_user": other_user,
+        "other_user_is_online": other_user_is_online,
         "messages_list": messages_list,
-        "chatrooms": chatrooms
+        "chatrooms": chatrooms,
     })
 
-
-
-# def serialize_message(message):
-#     local_time = timezone.localtime(message.created_at)
-
-#     return {
-#         "id": message.id,
-#         "message_id": message.id,
-#         "room_id": message.room.id,
-#         "message": message.message,
-#         "sender_id": message.sender.id,
-#         "receiver_id": message.receiver.id,
-#         "sender_username": message.sender.username,
-#         "receiver_username": message.receiver.username,
-#         "created_at": local_time.strftime("%I:%M %p"),
-#     }
-
-def serialize_message(message):
-    local_time = timezone.localtime(message.created_at)
-
-    reply_data = None
-
-    if message.reply_to:
-        reply_data = {
-            "id": message.reply_to.id,
-            "message": message.reply_to.message,
-            "sender_username": message.reply_to.sender.username,
-        }
-
-    return {
-        "id": message.id,
-        "message_id": message.id,
-        "room_id": message.room.id,
-        "message": message.message,
-        "sender_id": message.sender.id,
-        "receiver_id": message.receiver.id,
-        "sender_username": message.sender.username,
-        "receiver_username": message.receiver.username,
-        "created_at": local_time.strftime("%I:%M %p"),
-        "is_edited": message.is_edited,
-        "reply_to": reply_data,
-    }
 
 
 
@@ -299,6 +403,9 @@ def serialize_message(message):
 #     except ChatRoom.DoesNotExist:
 #         return JsonResponse({"success": False, "error": "Room not found"}, status=404)
 
+
+
+
 @login_required
 @require_POST
 def send_message_api(request, room_id):
@@ -306,13 +413,19 @@ def send_message_api(request, room_id):
         room = ChatRoom.objects.select_related("user1", "user2").get(id=room_id)
 
         if request.user.id not in [room.user1_id, room.user2_id]:
-            return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
+            return JsonResponse({
+                "success": False,
+                "error": "Not allowed"
+            }, status=403)
 
         message_text = request.POST.get("message", "").strip()
         reply_to_id = request.POST.get("reply_to_id", "").strip()
 
-        if message_text == "":
-            return JsonResponse({"success": False, "error": "Empty message"}, status=400)
+        if not message_text:
+            return JsonResponse({
+                "success": False,
+                "error": "Empty message"
+            }, status=400)
 
         if request.user.id == room.user1_id:
             receiver = room.user2
@@ -327,18 +440,32 @@ def send_message_api(request, room_id):
                 room=room
             ).select_related("sender").first()
 
+        delivered_time = None
+
+        if is_user_online(receiver):
+            delivered_time = timezone.now()
+
         message = Message.objects.create(
             room=room,
             sender=request.user,
             receiver=receiver,
             reply_to=reply_to_message,
             message=message_text,
-            is_read=False
+            is_read=False,
+            delivered_at=delivered_time
         )
 
         room.save()
 
-        data = serialize_message(message)
+        message = Message.objects.select_related(
+            "sender",
+            "receiver",
+            "room",
+            "reply_to",
+            "reply_to__sender"
+        ).get(id=message.id)
+
+        data = serialize_message(message, request.user)
         data["event_type"] = "new_message"
 
         channel_layer = get_channel_layer()
@@ -352,15 +479,28 @@ def send_message_api(request, room_id):
                 }
             )
 
-        return JsonResponse({"success": True, "message": data})
+        return JsonResponse({
+            "success": True,
+            "message": data
+        })
 
     except ChatRoom.DoesNotExist:
-        return JsonResponse({"success": False, "error": "Room not found"}, status=404)
+        return JsonResponse({
+            "success": False,
+            "error": "Room not found"
+        }, status=404)
 
+    except Exception as e:
+        return JsonResponse({
+            "success": False,
+            "error": str(e)
+        }, status=500)
+
+
+    
 
 @login_required
 @require_GET
-
 def chat_messages_api(request, room_id):
     try:
         room = ChatRoom.objects.get(id=room_id)
@@ -375,9 +515,11 @@ def chat_messages_api(request, room_id):
         except ValueError:
             after_id = 0
 
-        messages = Message.objects.filter(
+        messages_list = Message.objects.filter(
             room=room,
             id__gt=after_id
+        ).exclude(
+            deleted_for=request.user
         ).select_related(
             "sender",
             "receiver",
@@ -386,20 +528,14 @@ def chat_messages_api(request, room_id):
             "reply_to__sender"
         ).order_by("created_at")
 
-        Message.objects.filter(
-            room=room,
-            receiver=request.user,
-            is_read=False
-        ).update(is_read=True)
-
         return JsonResponse({
             "success": True,
-            "messages": [serialize_message(msg) for msg in messages]
+            "messages": [serialize_message(msg, request.user) for msg in messages_list]
         })
 
     except ChatRoom.DoesNotExist:
         return JsonResponse({"success": False, "error": "Room not found"}, status=404)
-    
+
 
 @login_required
 @require_POST
@@ -425,6 +561,12 @@ def edit_message_api(request, room_id, message_id):
 
         if new_text == "":
             return JsonResponse({"success": False, "error": "Empty message"}, status=400)
+        
+        if message.deleted_for_everyone:
+            return JsonResponse({
+                "success": False,
+                "error": "Deleted message cannot be edited."
+            }, status=400)
 
         message.message = new_text
         message.is_edited = True
@@ -432,6 +574,7 @@ def edit_message_api(request, room_id, message_id):
         message.save()
 
         data = serialize_message(message)
+        data = serialize_message(message, request.user)
         data["event_type"] = "message_updated"
 
         channel_layer = get_channel_layer()
@@ -509,37 +652,322 @@ def chat_list_api(request):
         else:
             other_user = room.user1
 
-        last_message = room.messages.order_by("-created_at").first()
+        profile, created = Profile.objects.get_or_create(user=other_user)
+
+        last_message = room.messages.exclude(
+            deleted_for=request.user
+        ).order_by("-created_at").first()
 
         unread_count = Message.objects.filter(
             room=room,
             receiver=request.user,
-            is_read=False
+            is_read=False,
+            deleted_for_everyone=False
+        ).exclude(
+            deleted_for=request.user
         ).count()
 
-        is_online = False
+        is_online = is_user_online(other_user)
 
-        if hasattr(other_user, "profile") and other_user.profile.last_seen:
-            if other_user.profile.last_seen >= timezone.now() - timedelta(seconds=90):
-                is_online = True
+        if last_message:
+            if last_message.deleted_for_everyone:
+                last_message_text = "This message was deleted"
+            else:
+                last_message_text = last_message.message
+        else:
+            last_message_text = "No messages yet"
+
+        profile_picture_url = ""
+
+        if profile.profile_picture:
+            profile_picture_url = profile.profile_picture.url
 
         rooms_data.append({
             "room_id": room.id,
             "other_user_id": other_user.id,
             "other_username": other_user.username,
             "avatar": other_user.username[:1].upper(),
+            "profile_picture_url": profile_picture_url,
             "is_online": is_online,
-            "last_message": last_message.message if last_message else "No messages yet",
+            "last_message": last_message_text,
             "last_sender_id": last_message.sender.id if last_message else None,
             "last_time": timezone.localtime(last_message.created_at).strftime("%I:%M %p") if last_message else "",
             "unread_count": unread_count,
             "chat_url": f"/chat/{room.id}/",
+            "profile_url": f"/profile/{other_user.id}/",
         })
 
     return JsonResponse({
         "success": True,
         "rooms": rooms_data,
     })
+
+# @login_required
+# def chat_list_api(request):
+#     chatrooms = ChatRoom.objects.filter(
+#         user1=request.user
+#     ) | ChatRoom.objects.filter(
+#         user2=request.user
+#     )
+
+#     chatrooms = chatrooms.select_related(
+#         "user1",
+#         "user2",
+#         "user1__profile",
+#         "user2__profile"
+#     ).order_by("-updated_at")
+
+#     rooms_data = []
+
+#     for room in chatrooms:
+#         if room.user1 == request.user:
+#             other_user = room.user2
+#         else:
+#             other_user = room.user1
+
+#         last_message = room.messages.order_by("-created_at").first()
+
+#         unread_count = Message.objects.filter(
+#             room=room,
+#             receiver=request.user,
+#             is_read=False
+#         ).count()
+
+#         # same logic jo chat header me use ho raha hai
+#         is_online = False
+
+#         if hasattr(other_user, "profile") and other_user.profile.last_seen:
+#             if other_user.profile.last_seen >= timezone.now() - timedelta(seconds=90):
+#                 is_online = True
+
+#         rooms_data.append({
+#             "room_id": room.id,
+#             "other_user_id": other_user.id,
+#             "other_username": other_user.username,
+#             "avatar": other_user.username[:1].upper(),
+#             "is_online": is_online,
+#             "last_message": last_message.message if last_message else "No messages yet",
+#             "last_sender_id": last_message.sender.id if last_message else None,
+#             "last_time": timezone.localtime(last_message.created_at).strftime("%I:%M %p") if last_message else "",
+#             "unread_count": unread_count,
+#             "chat_url": f"/chat/{room.id}/",
+#         })
+
+#     return JsonResponse({
+#         "success": True,
+#         "rooms": rooms_data,
+#     })
+
+@login_required
+def profile_view(request, user_id):
+    profile_user = get_object_or_404(User, id=user_id)
+    profile, created = Profile.objects.get_or_create(user=profile_user)
+
+    profile_is_online = is_user_online(profile_user)
+
+    last_seen_text = "Not available"
+
+    if profile.last_seen:
+        last_seen_text = timezone.localtime(profile.last_seen).strftime("%d %b %Y, %I:%M %p")
+
+    return render(request, "chat/profile.html", {
+        "profile_user": profile_user,
+        "profile": profile,
+        "profile_is_online": profile_is_online,
+        "last_seen_text": last_seen_text,
+    })
+
+
+@login_required
+def edit_profile_view(request):
+    profile, created = Profile.objects.get_or_create(user=request.user)
+
+    if request.method == "POST":
+        full_name = request.POST.get("full_name", "").strip()
+        bio = request.POST.get("bio", "").strip()
+        profile_picture = request.FILES.get("profile_picture")
+
+        profile.full_name = full_name
+        profile.bio = bio
+
+        if profile_picture:
+            profile.profile_picture = profile_picture
+
+        profile.save()
+
+        messages.success(request, "Profile updated successfully.")
+        return redirect("profile_view", user_id=request.user.id)
+
+    return render(request, "chat/edit_profile.html", {
+        "profile": profile,
+    })
+
+@login_required
+@require_POST
+def delete_message_api(request, room_id, message_id):
+    room = get_object_or_404(ChatRoom, id=room_id)
+
+    if request.user.id not in [room.user1_id, room.user2_id]:
+        return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
+
+    message = get_object_or_404(Message, id=message_id, room=room)
+
+    delete_type = request.POST.get("delete_type", "").strip()
+
+    if delete_type == "me":
+        message.deleted_for.add(request.user)
+
+        return JsonResponse({
+            "success": True,
+            "delete_type": "me",
+            "message_id": message.id,
+        })
+
+    if delete_type == "everyone":
+        if message.sender != request.user:
+            return JsonResponse({
+                "success": False,
+                "error": "You can delete only your own message for everyone."
+            }, status=403)
+
+        message.deleted_for_everyone = True
+        message.deleted_for_everyone_at = timezone.now()
+        message.save()
+
+        data = {
+            "event_type": "message_deleted",
+            "delete_type": "everyone",
+            "message_id": message.id,
+            "room_id": room.id,
+            "message": "This message was deleted",
+        }
+
+        channel_layer = get_channel_layer()
+
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{room.id}",
+                {
+                    "type": "message_deleted",
+                    "data": data,
+                }
+            )
+
+        return JsonResponse({
+            "success": True,
+            "delete_type": "everyone",
+            "message_id": message.id,
+            "message": "This message was deleted",
+        })
+
+    return JsonResponse({
+        "success": False,
+        "error": "Invalid delete type."
+    }, status=400)
+
+@login_required
+@require_POST
+def mark_seen_api(request, room_id):
+    room = get_object_or_404(ChatRoom, id=room_id)
+
+    if request.user.id not in [room.user1_id, room.user2_id]:
+        return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
+
+    now_time = timezone.now()
+
+    messages_to_update = Message.objects.filter(
+        room=room,
+        receiver=request.user,
+        seen_at__isnull=True,
+        deleted_for_everyone=False
+    ).exclude(
+        deleted_for=request.user
+    )
+
+    message_ids = list(messages_to_update.values_list("id", flat=True))
+
+    messages_to_update.update(
+        is_read=True,
+        delivered_at=now_time,
+        seen_at=now_time
+    )
+
+    if message_ids:
+        channel_layer = get_channel_layer()
+
+        if channel_layer is not None:
+            async_to_sync(channel_layer.group_send)(
+                f"chat_{room.id}",
+                {
+                    "type": "message_status_updated",
+                    "data": {
+                        "event_type": "message_status_updated",
+                        "message_ids": message_ids,
+                        "status_text": "Seen",
+                    }
+                }
+            )
+
+    return JsonResponse({
+        "success": True,
+        "message_ids": message_ids,
+        "status_text": "Seen",
+    })
+
+# @login_required
+# def chat_list_api(request):
+#     chatrooms = ChatRoom.objects.filter(
+#         user1=request.user
+#     ) | ChatRoom.objects.filter(
+#         user2=request.user
+#     )
+
+#     chatrooms = chatrooms.select_related(
+#         "user1",
+#         "user2",
+#         "user1__profile",
+#         "user2__profile"
+#     ).order_by("-updated_at")
+
+#     rooms_data = []
+
+#     for room in chatrooms:
+#         if room.user1 == request.user:
+#             other_user = room.user2
+#         else:
+#             other_user = room.user1
+
+#         last_message = room.messages.order_by("-created_at").first()
+
+#         unread_count = Message.objects.filter(
+#             room=room,
+#             receiver=request.user,
+#             is_read=False
+#         ).count()
+
+#         is_online = False
+
+#         if hasattr(other_user, "profile") and other_user.profile.last_seen:
+#             if other_user.profile.last_seen >= timezone.now() - timedelta(seconds=90):
+#                 is_online = True
+
+#         rooms_data.append({
+#             "room_id": room.id,
+#             "other_user_id": other_user.id,
+#             "other_username": other_user.username,
+#             "avatar": other_user.username[:1].upper(),
+#             "is_online": is_online,
+#             "last_message": last_message.message if last_message else "No messages yet",
+#             "last_sender_id": last_message.sender.id if last_message else None,
+#             "last_time": timezone.localtime(last_message.created_at).strftime("%I:%M %p") if last_message else "",
+#             "unread_count": unread_count,
+#             "chat_url": f"/chat/{room.id}/",
+#         })
+
+#     return JsonResponse({
+#         "success": True,
+#         "rooms": rooms_data,
+#     })
 
 # def chat_messages_api(request, room_id):
 #     try:

@@ -13,13 +13,14 @@
 <nav class="navbar">
     <a href="{% url 'home' %}" class="brand">
         <span class="brand-icon">💬</span>
-        <span>ChatVerse</span>
+        <span>ChatBridge</span>
     </a>
 
     <div class="nav-links">
         {% if user.is_authenticated %}
             <a href="{% url 'home' %}">Chats</a>
             <a href="{% url 'users' %}">Find User</a>
+            <a href="{% url 'profile_view' request.user.id %}">My Profile</a>
             <span class="nav-user">{{ user.username }}</span>
             <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
         {% else %}

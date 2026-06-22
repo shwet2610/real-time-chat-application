@@ -16,6 +16,12 @@ urlpatterns = [
     path("chat/<int:room_id>/send/", views.send_message_api, name="send_message_api"),
     path("chat/<int:room_id>/messages/", views.chat_messages_api, name="chat_messages_api"),
     path("api/chats/", views.chat_list_api, name="chat_list_api"),
+
+    path("profile/<int:user_id>/", views.profile_view, name="profile_view"),
+    path("profile/edit/", views.edit_profile_view, name="edit_profile"),
+
+    path("chat/<int:room_id>/delete/<int:message_id>/", views.delete_message_api, name="delete_message_api"),
+    path("chat/<int:room_id>/mark-seen/", views.mark_seen_api, name="mark_seen_api"),
     # path("chat/<int:room_id>/send/", views.send_message_api, name="send_message_api"),
     # path("chat/<int:room_id>/messages/", views.chat_messages_api, name="chat_messages_api"),
     path("chat/<int:room_id>/edit/<int:message_id>/", views.edit_message_api, name="edit_message_api"),

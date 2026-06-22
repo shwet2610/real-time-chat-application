@@ -1,0 +1,55 @@
+{% extends 'chat/base.html' %}
+
+{% block content %}
+<div class="profile-page-container">
+
+    <div class="profile-card">
+        <div class="profile-cover"></div>
+
+        <div class="profile-main">
+            {% if profile.profile_picture %}
+                <img src="{{ profile.profile_picture.url }}" class="profile-photo" alt="Profile picture">
+            {% else %}
+                <div class="profile-photo profile-photo-fallback">
+                    {{ profile_user.username|first|upper }}
+                </div>
+            {% endif %}
+
+            <h1>
+                {% if profile.full_name %}
+                    {{ profile.full_name }}
+                {% else %}
+                    {{ profile_user.username }}
+                {% endif %}
+            </h1>
+
+            <p class="profile-username">@{{ profile_user.username }}</p>
+
+            {% if profile_is_online %}
+                <span class="profile-status online">Online</span>
+            {% else %}
+                <span class="profile-status offline">Last seen {{ last_seen_text }}</span>
+            {% endif %}
+
+            <div class="profile-bio-box">
+                <h3>Bio</h3>
+
+                {% if profile.bio %}
+                    <p>{{ profile.bio }}</p>
+                {% else %}
+                    <p>No bio added yet.</p>
+                {% endif %}
+            </div>
+
+            <div class="profile-actions">
+                {% if profile_user == request.user %}
+                    <a href="{% url 'edit_profile' %}" class="main-btn profile-action-btn">Edit Profile</a>
+                {% else %}
+                    <a href="{% url 'start_chat' profile_user.id %}" class="main-btn profile-action-btn">Message</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+</div>
+{% endblock %}

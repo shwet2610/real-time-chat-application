@@ -2,20 +2,35 @@ from django.db import models
 from django.contrib.auth.models import User
 
 
+# class Profile(models.Model):
+#     user = models.OneToOneField(
+#         User,
+#         on_delete=models.CASCADE,
+#         related_name="profile"
+#     )
+#     full_name = models.CharField(max_length=100, blank=True)
+#     is_online = models.BooleanField(default=False)
+#     last_seen = models.DateTimeField(null=True, blank=True)
+#     created_at = models.DateTimeField(auto_now_add=True)
+
+#     def __str__(self):
+#         return self.user.username
+
+
 class Profile(models.Model):
-    user = models.OneToOneField(
-        User,
-        on_delete=models.CASCADE,
-        related_name="profile"
-    )
-    full_name = models.CharField(max_length=100, blank=True)
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="profile")
+
+    full_name = models.CharField(max_length=120, blank=True)
+    bio = models.CharField(max_length=180, blank=True)
+    profile_picture = models.ImageField(upload_to="profile_pics/", blank=True, null=True)
+
     is_online = models.BooleanField(default=False)
     last_seen = models.DateTimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return self.user.username
-
 
 class ChatRoom(models.Model):
     user1 = models.ForeignKey(
@@ -52,10 +67,23 @@ class Message(models.Model):
     )
 
     message = models.TextField()
+
     is_read = models.BooleanField(default=False)
+
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    seen_at = models.DateTimeField(null=True, blank=True)
 
     is_edited = models.BooleanField(default=False)
     edited_at = models.DateTimeField(null=True, blank=True)
+
+    deleted_for = models.ManyToManyField(
+        User,
+        blank=True,
+        related_name="deleted_messages"
+    )
+
+    deleted_for_everyone = models.BooleanField(default=False)
+    deleted_for_everyone_at = models.DateTimeField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -64,28 +92,3 @@ class Message(models.Model):
 
     def __str__(self):
         return f"{self.sender.username} to {self.receiver.username}: {self.message[:30]}"
-# class Message(models.Model):
-#     room = models.ForeignKey(
-#         ChatRoom,
-#         on_delete=models.CASCADE,
-#         related_name="messages"
-#     )
-#     sender = models.ForeignKey(
-#         User,
-#         on_delete=models.CASCADE,
-#         related_name="sent_messages"
-#     )
-#     receiver = models.ForeignKey(
-#         User,
-#         on_delete=models.CASCADE,
-#         related_name="received_messages"
-#     )
-#     message = models.TextField()
-#     is_read = models.BooleanField(default=False)
-#     created_at = models.DateTimeField(auto_now_add=True)
-
-#     class Meta:
-#         ordering = ["created_at"]
-
-#     def __str__(self):
-#         return f"{self.sender.username} to {self.receiver.username}: {self.message[:30]}"
