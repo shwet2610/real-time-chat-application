@@ -242,6 +242,38 @@
 
 </div>
 
+<div class="message-action-overlay" id="messageActionOverlay">
+    <div class="message-action-sheet">
+        <div class="message-action-header">
+            <span id="messageActionTitle">Message options</span>
+        </div>
+
+        <button type="button" class="message-action-item" data-menu-action="reply">
+            <span>↩</span>
+            Reply
+        </button>
+
+        <button type="button" class="message-action-item" data-menu-action="edit" id="menuEditBtn">
+            <span>✎</span>
+            Edit
+        </button>
+
+        <button type="button" class="message-action-item" data-menu-action="delete-me">
+            <span>🗑</span>
+            Delete for me
+        </button>
+
+        <button type="button" class="message-action-item danger" data-menu-action="delete-everyone" id="menuDeleteEveryoneBtn">
+            <span>🗑</span>
+            Delete for everyone
+        </button>
+
+        <button type="button" class="message-action-cancel" data-menu-action="cancel">
+            Cancel
+        </button>
+    </div>
+</div>
+
 <script>
     const roomId = "{{ room.id }}";
     const currentUserId = Number("{{ request.user.id }}");
@@ -261,6 +293,16 @@
 
     const onlineStatus = document.getElementById("onlineStatus");
     const typingIndicator = document.getElementById("typingIndicator");
+
+    const messageActionOverlay = document.getElementById("messageActionOverlay");
+    const messageActionSheet = document.querySelector(".message-action-sheet");
+    const messageActionTitle = document.getElementById("messageActionTitle");
+    const menuEditBtn = document.getElementById("menuEditBtn");
+    const menuDeleteEveryoneBtn = document.getElementById("menuDeleteEveryoneBtn");
+
+    let selectedMessageRow = null;
+    let longPressTimer = null;
+    let ignoreNextClick = false;
 
     let socket = null;
     let lastMessageId = 0;
@@ -393,6 +435,213 @@
         button.dataset.messageId = messageId;
 
         return button;
+    }
+
+    {% comment %} function openMessageMenu(row) {
+    if (!row) {
+        return;
+    }
+
+    const actions = row.querySelector(".message-actions");
+
+    if (!actions) {
+        return;
+    }
+
+    selectedMessageRow = row;
+
+    const messageText = row.querySelector(".message-text");
+    const senderId = Number(row.dataset.senderId);
+    const isOwnMessage = senderId === currentUserId;
+
+    if (messageText) {
+        messageActionTitle.textContent = truncateText(messageText.textContent.trim(), 35);
+    } else {
+        messageActionTitle.textContent = "Message options";
+    }
+
+    if (isOwnMessage) {
+        menuEditBtn.style.display = "flex";
+        menuDeleteEveryoneBtn.style.display = "flex";
+    } else {
+        menuEditBtn.style.display = "none";
+        menuDeleteEveryoneBtn.style.display = "none";
+    }
+
+    messageActionOverlay.classList.add("show");
+} {% endcomment %}
+    function openMessageMenu(row) {
+    if (!row) {
+        return;
+    }
+
+    const actions = row.querySelector(".message-actions");
+
+    if (!actions) {
+        return;
+    }
+
+    const bubble = row.querySelector(".bubble");
+
+    if (!bubble) {
+        return;
+    }
+
+    selectedMessageRow = row;
+
+    const messageText = row.querySelector(".message-text");
+    const senderId = Number(row.dataset.senderId);
+    const isOwnMessage = senderId === currentUserId;
+
+    if (messageText) {
+        messageActionTitle.textContent = truncateText(messageText.textContent.trim(), 35);
+    } else {
+        messageActionTitle.textContent = "Message options";
+    }
+
+    if (isOwnMessage) {
+        menuEditBtn.style.display = "flex";
+        menuDeleteEveryoneBtn.style.display = "flex";
+    } else {
+        menuEditBtn.style.display = "none";
+        menuDeleteEveryoneBtn.style.display = "none";
+    }
+
+    messageActionOverlay.classList.add("show");
+
+    messageActionSheet.style.visibility = "hidden";
+    messageActionSheet.style.left = "0px";
+    messageActionSheet.style.top = "0px";
+
+    requestAnimationFrame(function () {
+        const bubbleRect = bubble.getBoundingClientRect();
+
+        const sheetWidth = messageActionSheet.offsetWidth;
+        const sheetHeight = messageActionSheet.offsetHeight;
+
+        let top = bubbleRect.top - sheetHeight - 8;
+
+        if (top < 74) {
+            top = bubbleRect.bottom + 8;
+        }
+
+        if (top + sheetHeight > window.innerHeight - 12) {
+            top = window.innerHeight - sheetHeight - 12;
+        }
+
+        let left;
+
+        if (isOwnMessage) {
+            left = bubbleRect.right - sheetWidth;
+            messageActionSheet.classList.add("menu-own");
+            messageActionSheet.classList.remove("menu-other");
+        } else {
+            left = bubbleRect.left;
+            messageActionSheet.classList.add("menu-other");
+            messageActionSheet.classList.remove("menu-own");
+        }
+
+        if (left < 10) {
+            left = 10;
+        }
+
+        if (left + sheetWidth > window.innerWidth - 10) {
+            left = window.innerWidth - sheetWidth - 10;
+        }
+
+        messageActionSheet.style.top = `${top}px`;
+        messageActionSheet.style.left = `${left}px`;
+        messageActionSheet.style.visibility = "visible";
+    });
+    }
+
+
+    function closeMessageMenu() {
+    messageActionOverlay.classList.remove("show");
+
+    messageActionSheet.style.visibility = "hidden";
+    messageActionSheet.style.left = "0px";
+    messageActionSheet.style.top = "0px";
+
+    selectedMessageRow = null;
+    }
+
+    async function handleMessageMenuAction(action) {
+        if (!selectedMessageRow) {
+        return;
+    }
+
+    const row = selectedMessageRow;
+    const messageId = row.dataset.messageId;
+
+    if (action === "reply") {
+        const replyBtn = row.querySelector(".reply-btn");
+
+        if (replyBtn) {
+            clearEditMode();
+
+            replyToInput.value = replyBtn.dataset.messageId;
+            replySender.textContent = replyBtn.dataset.sender;
+            replyText.textContent = replyBtn.dataset.messageText;
+            replyPreview.style.display = "flex";
+
+            closeMessageMenu();
+            focusMessageInput();
+        }
+
+        return;
+    }
+
+    if (action === "edit") {
+        const editBtn = row.querySelector(".edit-btn");
+
+        if (editBtn) {
+            clearReply();
+
+            editingMessageId = editBtn.dataset.messageId;
+            messageInput.value = editBtn.dataset.messageText;
+            messageInput.placeholder = "Edit your message...";
+            sendBtn.textContent = "Update";
+
+            closeMessageMenu();
+            focusMessageInput();
+        }
+
+        return;
+    }
+
+    if (action === "delete-me") {
+        closeMessageMenu();
+
+        const data = await deleteMessageByApi(messageId, "me");
+
+        if (data.success) {
+            row.remove();
+            showEmptyChatIfNeeded();
+        } else {
+            console.log("Delete for me failed:", data.error);
+        }
+
+        return;
+    }
+
+    if (action === "delete-everyone") {
+        closeMessageMenu();
+
+        const data = await deleteMessageByApi(messageId, "everyone");
+
+        if (data.success) {
+            markMessageDeletedForEveryone(data);
+        } else {
+            console.log("Delete for everyone failed:", data.error);
+        }
+
+        return;
+    }
+
+    if (action === "cancel") {
+        closeMessageMenu();
+    }
     }
 
     function addTempMessageToScreen(tempId, messageTextValue) {
@@ -890,7 +1139,7 @@
         };
     }
 
-    chatMessages.addEventListener("click", async function (event) {
+    {% comment %} chatMessages.addEventListener("click", async function (event) {
     const target = event.target;
 
     if (target.classList.contains("reply-btn")) {
@@ -952,6 +1201,92 @@
         focusMessageInput();
         return;
     }
+    }); {% endcomment %}
+
+
+    chatMessages.addEventListener("click", function (event) {
+    const bubble = event.target.closest(".bubble");
+
+    if (!bubble) {
+        return;
+    }
+
+    if (ignoreNextClick) {
+        ignoreNextClick = false;
+        return;
+    }
+
+    const row = bubble.closest(".bubble-row");
+
+    if (!row) {
+        return;
+    }
+
+    openMessageMenu(row);
+});
+
+chatMessages.addEventListener("contextmenu", function (event) {
+    const bubble = event.target.closest(".bubble");
+
+    if (!bubble) {
+        return;
+    }
+
+    event.preventDefault();
+
+    const row = bubble.closest(".bubble-row");
+
+    if (!row) {
+        return;
+    }
+
+    openMessageMenu(row);
+});
+
+chatMessages.addEventListener("touchstart", function (event) {
+    const bubble = event.target.closest(".bubble");
+
+    if (!bubble) {
+        return;
+    }
+
+    const row = bubble.closest(".bubble-row");
+
+    if (!row) {
+        return;
+    }
+
+    clearTimeout(longPressTimer);
+
+    longPressTimer = setTimeout(function () {
+        ignoreNextClick = true;
+        openMessageMenu(row);
+    }, 450);
+    }, { passive: true });
+
+    chatMessages.addEventListener("touchend", function () {
+        clearTimeout(longPressTimer);
+    });
+
+    chatMessages.addEventListener("touchmove", function () {
+        clearTimeout(longPressTimer);
+    });
+
+    messageActionOverlay.addEventListener("click", async function (event) {
+    if (event.target === messageActionOverlay) {
+        closeMessageMenu();
+        return;
+    }
+
+    const actionButton = event.target.closest("[data-menu-action]");
+
+    if (!actionButton) {
+        return;
+    }
+
+    const action = actionButton.dataset.menuAction;
+
+    await handleMessageMenuAction(action);
     });
 
     cancelReplyBtn.addEventListener("click", function () {

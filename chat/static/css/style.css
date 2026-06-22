@@ -1890,3 +1890,273 @@ img.avatar {
         display: none;
     }
 }
+
+/* ===================== Instagram Style Message Options ===================== */
+
+/* Purane inline reply/edit/delete buttons hide */
+.message-actions {
+    display: none !important;
+}
+
+/* Message bubble clickable feel */
+.bubble {
+    cursor: pointer;
+    user-select: none;
+}
+
+.bubble:active {
+    transform: scale(0.985);
+}
+
+/* Overlay */
+.message-action-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+    display: none;
+    align-items: flex-end;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.message-action-overlay.show {
+    display: flex;
+}
+
+/* Sheet */
+.message-action-sheet {
+    width: min(420px, calc(100% - 22px));
+    margin: 0 0 16px;
+    background: linear-gradient(180deg, var(--color-surface-soft) 0%, var(--color-surface) 100%);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 22px;
+    box-shadow: var(--shadow-lg);
+    overflow: hidden;
+    animation: action-sheet-up 0.18s ease;
+}
+
+@keyframes action-sheet-up {
+    from {
+        opacity: 0;
+        transform: translateY(18px) scale(0.98);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.message-action-header {
+    padding: 14px 18px 12px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--text-tertiary);
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.message-action-item,
+.message-action-cancel {
+    width: 100%;
+    min-height: 48px;
+    padding: 0 18px;
+    border: none;
+    background: transparent;
+    color: var(--text-primary);
+    font-size: 14px;
+    font-weight: 650;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    text-align: left;
+    transition: background-color 0.15s ease;
+}
+
+.message-action-item span {
+    width: 22px;
+    text-align: center;
+    font-size: 15px;
+}
+
+.message-action-item:hover,
+.message-action-cancel:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.message-action-item.danger {
+    color: #fca5a5;
+}
+
+.message-action-item.danger:hover {
+    background: rgba(248, 113, 113, 0.12);
+}
+
+.message-action-cancel {
+    justify-content: center;
+    border-top: 1px solid var(--color-border);
+    color: var(--text-secondary);
+    font-weight: 800;
+}
+
+/* Desktop par small centered popover look */
+@media (min-width: 851px) {
+    .message-action-overlay {
+        align-items: center;
+    }
+
+    .message-action-sheet {
+        margin: 0;
+        max-width: 360px;
+        border-radius: 20px;
+    }
+}
+
+/* Mobile polish */
+@media (max-width: 850px) {
+    .message-action-sheet {
+        margin-bottom: calc(12px + env(safe-area-inset-bottom));
+        border-radius: 22px 22px 18px 18px;
+    }
+
+    .message-action-item,
+    .message-action-cancel {
+        min-height: 52px;
+        font-size: 15px;
+    }
+
+    .bubble {
+        cursor: default;
+    }
+}
+
+/* ===================== Insta Floating Message Menu Position Fix ===================== */
+/* Options page ke center me nahi, selected message ke paas show honge */
+
+.message-action-overlay {
+    display: none !important;
+    position: fixed;
+    inset: 0;
+    z-index: 5000;
+
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+
+    align-items: initial !important;
+    justify-content: initial !important;
+}
+
+.message-action-overlay.show {
+    display: block !important;
+}
+
+.message-action-sheet {
+    position: fixed !important;
+    width: max-content !important;
+    min-width: 210px;
+    max-width: 280px;
+
+    margin: 0 !important;
+    padding: 6px;
+
+    background: rgba(22, 24, 41, 0.96);
+    border: 1px solid var(--color-border-strong);
+    border-radius: 18px;
+    box-shadow: var(--shadow-lg), 0 0 22px rgba(139, 92, 246, 0.22);
+
+    overflow: hidden;
+    z-index: 5001;
+    transform: none !important;
+
+    animation: floating-menu-pop 0.14s ease;
+}
+
+@keyframes floating-menu-pop {
+    from {
+        opacity: 0;
+        transform: scale(0.96) translateY(5px);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.message-action-sheet::after {
+    content: "";
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background: rgba(22, 24, 41, 0.96);
+    border-left: 1px solid var(--color-border-strong);
+    border-top: 1px solid var(--color-border-strong);
+    transform: rotate(45deg);
+    bottom: -6px;
+}
+
+.message-action-sheet.menu-own::after {
+    right: 22px;
+}
+
+.message-action-sheet.menu-other::after {
+    left: 22px;
+}
+
+.message-action-header {
+    padding: 8px 10px 7px;
+    border-bottom: 1px solid var(--color-border);
+    color: var(--text-tertiary);
+    font-size: 11px;
+    font-weight: 700;
+
+    max-width: 245px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.message-action-item,
+.message-action-cancel {
+    min-height: 38px;
+    padding: 0 10px;
+    border-radius: 12px;
+
+    font-size: 13px;
+    font-weight: 700;
+    gap: 9px;
+}
+
+.message-action-item span {
+    width: 18px;
+    font-size: 13px;
+}
+
+.message-action-cancel {
+    margin-top: 4px;
+    border-top: none;
+    background: rgba(255, 255, 255, 0.045);
+    justify-content: center;
+}
+
+/* Mobile par bhi center sheet nahi aayegi */
+@media (max-width: 850px) {
+    .message-action-sheet {
+        min-width: 205px;
+        max-width: calc(100vw - 20px);
+        border-radius: 17px;
+    }
+
+    .message-action-item,
+    .message-action-cancel {
+        min-height: 40px;
+        font-size: 13.5px;
+    }
+
+    .message-action-header {
+        max-width: 220px;
+    }
+}
