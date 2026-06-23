@@ -414,6 +414,15 @@
         scrollToBottom();
         focusMessageInput();
     }
+    function clearTextSelection() {
+    if (window.getSelection) {
+        const selection = window.getSelection();
+
+        if (selection && selection.removeAllRanges) {
+            selection.removeAllRanges();
+        }
+    }
+    }
 
     function truncateText(text, limit) {
         if (!text) {
@@ -1203,6 +1212,20 @@
     }
     }); {% endcomment %}
 
+    chatMessages.addEventListener("selectstart", function (event) {
+    if (event.target.closest(".bubble")) {
+        event.preventDefault();
+        clearTextSelection();
+    }
+    });
+
+chatMessages.addEventListener("dragstart", function (event) {
+    if (event.target.closest(".bubble")) {
+        event.preventDefault();
+    }
+    });
+
+
 
     chatMessages.addEventListener("click", function (event) {
     const bubble = event.target.closest(".bubble");
@@ -1243,12 +1266,14 @@ chatMessages.addEventListener("contextmenu", function (event) {
     openMessageMenu(row);
 });
 
-chatMessages.addEventListener("touchstart", function (event) {
+    chatMessages.addEventListener("touchstart", function (event) {
     const bubble = event.target.closest(".bubble");
 
     if (!bubble) {
         return;
     }
+
+    clearTextSelection();
 
     const row = bubble.closest(".bubble-row");
 
@@ -1259,9 +1284,10 @@ chatMessages.addEventListener("touchstart", function (event) {
     clearTimeout(longPressTimer);
 
     longPressTimer = setTimeout(function () {
+        clearTextSelection();
         ignoreNextClick = true;
         openMessageMenu(row);
-    }, 450);
+    }, 380);
     }, { passive: true });
 
     chatMessages.addEventListener("touchend", function () {

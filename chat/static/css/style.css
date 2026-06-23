@@ -2160,3 +2160,27 @@ img.avatar {
         max-width: 220px;
     }
 }
+/* ===================== Stop Message Text Selection on Long Press ===================== */
+/* Long press par browser text select nahi karega */
+
+.chat-body .bubble,
+.chat-body .bubble *,
+.message-action-sheet,
+.message-action-sheet * {
+    user-select: none;
+    -webkit-user-select: none;
+    -ms-user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Inputs/textareas me typing/select normal rahega */
+.chat-compose input,
+.profile-form input,
+.profile-form textarea,
+.search-box input,
+.auth-card input {
+    user-select: text;
+    -webkit-user-select: text;
+    -webkit-touch-callout: default;
+}
