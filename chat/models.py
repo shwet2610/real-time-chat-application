@@ -66,7 +66,12 @@ class Message(models.Model):
         related_name="replies"
     )
 
-    message = models.TextField()
+    # message = models.TextField()
+    message = models.TextField(blank=True)
+    media_file = models.FileField(upload_to="chat_media/", blank=True, null=True)
+    media_type = models.CharField(max_length=30, blank=True)
+    media_name = models.CharField(max_length=255, blank=True)
+    media_size = models.PositiveIntegerField(default=0)
 
     is_read = models.BooleanField(default=False)
 

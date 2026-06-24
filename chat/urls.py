@@ -28,4 +28,6 @@ urlpatterns = [
 
     path("presence/heartbeat/", views.heartbeat_api, name="heartbeat_api"),
     path("presence/user/<int:user_id>/", views.user_status_api, name="user_status_api"),
+
+    path("app-admin/dashboard/", views.admin_dashboard_view, name="admin_dashboard"),
 ]
