@@ -12,6 +12,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count
+import os
 
 from .models import ChatRoom, Message, Profile
 
@@ -55,45 +56,62 @@ def is_user_online(user):
 
     return profile.last_seen >= timezone.now() - timedelta(seconds=90)
 
-MAX_CHAT_MEDIA_SIZE = 10 * 1024 * 1024
+MAX_VOICE_NOTE_SIZE = 6 * 1024 * 1024
 
-ALLOWED_CHAT_MEDIA_EXTENSIONS = [
-    ".jpg", ".jpeg", ".png", ".gif", ".webp",
-    ".pdf", ".doc", ".docx", ".txt"
+ALLOWED_VOICE_EXTENSIONS = [
+    ".webm", ".ogg", ".mp3", ".wav", ".m4a"
 ]
 
 
-def get_chat_media_type(file_name):
-    extension = os.path.splitext(file_name)[1].lower()
-
-    if extension in [".jpg", ".jpeg", ".png", ".gif", ".webp"]:
-        return "image"
-
-    if extension in [".pdf"]:
-        return "pdf"
-
-    if extension in [".doc", ".docx"]:
-        return "document"
-
-    if extension in [".txt"]:
-        return "text"
-
-    return "file"
-
-
-def validate_chat_media(uploaded_file):
+def validate_voice_note(uploaded_file):
     if not uploaded_file:
         return True, ""
 
     extension = os.path.splitext(uploaded_file.name)[1].lower()
 
-    if extension not in ALLOWED_CHAT_MEDIA_EXTENSIONS:
-        return False, "Only image, PDF, DOC, DOCX and TXT files are allowed."
+    if extension not in ALLOWED_VOICE_EXTENSIONS:
+        return False, "Only voice note audio files are allowed."
 
-    if uploaded_file.size > MAX_CHAT_MEDIA_SIZE:
-        return False, "File size should be less than 10 MB."
+    if uploaded_file.size > MAX_VOICE_NOTE_SIZE:
+        return False, "Voice note should be less than 6 MB."
 
     return True, ""
+
+
+def format_voice_duration(seconds):
+    try:
+        seconds = int(seconds)
+    except (TypeError, ValueError):
+        seconds = 0
+
+    minutes = seconds // 60
+    remaining_seconds = seconds % 60
+
+    return f"{minutes}:{remaining_seconds:02d}"
+
+def get_safe_file_url(file_field):
+    try:
+        if file_field and file_field.name:
+            return file_field.url
+    except ValueError:
+        return ""
+
+    return ""
+
+def get_last_message_preview(message, current_user):
+    if not message:
+        return "No messages yet"
+
+    if message.deleted_for_everyone:
+        return "This message was deleted"
+
+    if message.message:
+        return message.message
+
+    if message.voice_note:
+        return "🎙️ Voice message"
+
+    return "No messages yet"
 
 
 def get_last_message_preview(message, current_user):
@@ -174,11 +192,11 @@ def serialize_message(message, current_user=None):
         "seen_at": timezone.localtime(message.seen_at).strftime("%I:%M %p") if message.seen_at else "",
         "status_text": status_text,
 
-        "has_media": bool(message.media_file),
-        "media_url": message.media_file.url if message.media_file else "",
-        "media_type": message.media_type,
-        "media_name": message.media_name,
-        "media_size": message.media_size,
+        "has_voice": bool(get_safe_file_url(message.voice_note)),
+    "voice_url": get_safe_file_url(message.voice_note),
+    "voice_duration": message.voice_duration,
+    "voice_duration_text": format_voice_duration(message.voice_duration),
+
 
         "reply_to": reply_data,
     }
@@ -383,6 +401,7 @@ def chat_room_view(request, room_id):
     for msg in messages_list:
         msg.display_message = get_message_text_for_user(msg, request.user)
         msg.status_text = get_message_status(msg, request.user)
+        msg.voice_duration_text = format_voice_duration(msg.voice_duration)
 
     return render(request, "chat/chat_room.html", {
         "room": room,
@@ -392,99 +411,6 @@ def chat_room_view(request, room_id):
         "chatrooms": chatrooms,
     })
 
-
-
-
-
-# @login_required
-# @require_POST
-# def send_message_api(request, room_id):
-#     try:
-#         room = ChatRoom.objects.select_related("user1", "user2").get(id=room_id)
-
-#         if request.user.id not in [room.user1_id, room.user2_id]:
-#             return JsonResponse({
-#                 "success": False,
-#                 "error": "Not allowed"
-#             }, status=403)
-
-#         message_text = request.POST.get("message", "").strip()
-#         reply_to_id = request.POST.get("reply_to_id", "").strip()
-
-#         if not message_text:
-#             return JsonResponse({
-#                 "success": False,
-#                 "error": "Empty message"
-#             }, status=400)
-
-#         if request.user.id == room.user1_id:
-#             receiver = room.user2
-#         else:
-#             receiver = room.user1
-
-#         reply_to_message = None
-
-#         if reply_to_id:
-#             reply_to_message = Message.objects.filter(
-#                 id=reply_to_id,
-#                 room=room
-#             ).select_related("sender").first()
-
-#         delivered_time = None
-
-#         if is_user_online(receiver):
-#             delivered_time = timezone.now()
-
-#         message = Message.objects.create(
-#             room=room,
-#             sender=request.user,
-#             receiver=receiver,
-#             reply_to=reply_to_message,
-#             message=message_text,
-#             is_read=False,
-#             delivered_at=delivered_time
-#         )
-
-#         room.save()
-
-#         message = Message.objects.select_related(
-#             "sender",
-#             "receiver",
-#             "room",
-#             "reply_to",
-#             "reply_to__sender"
-#         ).get(id=message.id)
-
-#         data = serialize_message(message, request.user)
-#         data["event_type"] = "new_message"
-
-#         channel_layer = get_channel_layer()
-
-#         if channel_layer is not None:
-#             async_to_sync(channel_layer.group_send)(
-#                 f"chat_{room.id}",
-#                 {
-#                     "type": "chat_message",
-#                     "data": data,
-#                 }
-#             )
-
-#         return JsonResponse({
-#             "success": True,
-#             "message": data
-#         })
-
-#     except ChatRoom.DoesNotExist:
-#         return JsonResponse({
-#             "success": False,
-#             "error": "Room not found"
-#         }, status=404)
-
-#     except Exception as e:
-#         return JsonResponse({
-#             "success": False,
-#             "error": str(e)
-#         }, status=500)
 
 @login_required
 @require_POST
@@ -500,21 +426,28 @@ def send_message_api(request, room_id):
 
         message_text = request.POST.get("message", "").strip()
         reply_to_id = request.POST.get("reply_to_id", "").strip()
-        media_file = request.FILES.get("media_file")
 
-        if not message_text and not media_file:
+        voice_note = request.FILES.get("voice_note")
+        voice_duration = request.POST.get("voice_duration", "0")
+
+        if not message_text and not voice_note:
             return JsonResponse({
                 "success": False,
-                "error": "Please type a message or attach a file."
+                "error": "Please type a message or record a voice note."
             }, status=400)
 
-        is_valid_media, media_error = validate_chat_media(media_file)
+        is_valid_voice, voice_error = validate_voice_note(voice_note)
 
-        if not is_valid_media:
+        if not is_valid_voice:
             return JsonResponse({
                 "success": False,
-                "error": media_error
+                "error": voice_error
             }, status=400)
+
+        try:
+            voice_duration = int(float(voice_duration))
+        except (TypeError, ValueError):
+            voice_duration = 0
 
         if request.user.id == room.user1_id:
             receiver = room.user2
@@ -544,11 +477,9 @@ def send_message_api(request, room_id):
             delivered_at=delivered_time
         )
 
-        if media_file:
-            message.media_file = media_file
-            message.media_type = get_chat_media_type(media_file.name)
-            message.media_name = media_file.name
-            message.media_size = media_file.size
+        if voice_note:
+            message.voice_note = voice_note
+            message.voice_duration = voice_duration
             message.save()
 
         room.save()
@@ -1021,14 +952,19 @@ def admin_dashboard_view(request):
     total_profiles = Profile.objects.count()
     total_chats = ChatRoom.objects.count()
     total_messages = Message.objects.count()
-    total_media_messages = Message.objects.exclude(media_file="").count()
+
+    voice_messages_query = Message.objects.filter(
+        voice_note__isnull=False
+    ).exclude(
+        voice_note=""
+    )
+
+    total_voice_messages = voice_messages_query.count()
     active_users = Profile.objects.filter(last_seen__gte=online_limit).count()
 
     profiles = Profile.objects.select_related("user").order_by("-created_at")[:12]
 
-    recent_media_messages = Message.objects.exclude(
-        media_file=""
-    ).select_related(
+    recent_voice_messages = voice_messages_query.select_related(
         "sender",
         "receiver",
         "room"
@@ -1052,10 +988,10 @@ def admin_dashboard_view(request):
         "total_profiles": total_profiles,
         "total_chats": total_chats,
         "total_messages": total_messages,
-        "total_media_messages": total_media_messages,
+        "total_voice_messages": total_voice_messages,
         "active_users": active_users,
         "profiles": profiles,
-        "recent_media_messages": recent_media_messages,
+        "recent_voice_messages": recent_voice_messages,
         "recent_chats": recent_chats,
         "recent_messages": recent_messages,
     })

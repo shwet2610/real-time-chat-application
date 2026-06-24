@@ -237,8 +237,8 @@ class MessageInline(admin.TabularInline):
         "sender",
         "receiver",
         "message",
-        "media_preview",
-        "media_name",
+        "voice_preview",
+        "voice_duration",
         "is_read",
         "delivered_at",
         "seen_at",
@@ -249,8 +249,7 @@ class MessageInline(admin.TabularInline):
         "sender",
         "receiver",
         "message",
-        "media_preview",
-        "media_name",
+        "voice_preview",
         "is_read",
         "delivered_at",
         "seen_at",
@@ -262,23 +261,16 @@ class MessageInline(admin.TabularInline):
     def has_add_permission(self, request, obj=None):
         return False
 
-    def media_preview(self, obj):
-        if not obj.media_file:
+    def voice_preview(self, obj):
+        if not obj.voice_note or not obj.voice_note.name:
             return "-"
 
-        if obj.media_type == "image":
-            return format_html(
-                '<a href="{}" target="_blank"><img src="{}" style="width:55px;height:55px;border-radius:8px;object-fit:cover;" /></a>',
-                obj.media_file.url,
-                obj.media_file.url
-            )
-
         return format_html(
-            '<a href="{}" target="_blank">Open File</a>',
-            obj.media_file.url
-        )
+        '<audio controls style="width:180px;"><source src="{}"></audio>',
+        obj.voice_note.url
+    )
 
-    media_preview.short_description = "Media"
+    voice_preview.short_description = "Voice Note"
 
 
 @admin.register(ChatRoom)
@@ -329,9 +321,12 @@ class ChatRoomAdmin(admin.ModelAdmin):
 
         if last_msg.message:
             return f"{last_msg.sender.username}: {last_msg.message[:60]}"
+        
+        if last_msg.voice_note:
+            return f"{last_msg.sender.username}: Voice message"
 
-        if last_msg.media_file:
-            return f"{last_msg.sender.username}: {last_msg.media_name}"
+        # if last_msg.media_file:
+        #     return f"{last_msg.sender.username}: {last_msg.media_name}"
 
         return "No messages"
 

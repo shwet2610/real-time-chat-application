@@ -1,243 +1,232 @@
 {% extends 'chat/base.html' %}
 
 {% block content %}
-<div class="admin-dashboard-container">
-
+  <div class="admin-dashboard-container">
     <div class="admin-dashboard-header">
-        <div>
-            <h1>Admin Dashboard</h1>
-            <p>Complete overview of users, profiles, chats, messages and media activity.</p>
-        </div>
+      <div>
+        <h1>Admin Dashboard</h1>
+        <p>Complete overview of users, profiles, chats, messages and media activity.</p>
+      </div>
 
-        <a href="/admin/" class="main-btn admin-panel-btn">Open Django Admin</a>
+      <a href="/admin/" class="main-btn admin-panel-btn">Open Django Admin</a>
     </div>
 
     <div class="admin-stats-grid">
-        <div class="admin-stat-card">
-            <span>Total Users</span>
-            <h2>{{ total_users }}</h2>
-        </div>
+      <div class="admin-stat-card">
+        <span>Total Users</span>
+        <h2>{{ total_users }}</h2>
+      </div>
 
-        <div class="admin-stat-card">
-            <span>Profiles</span>
-            <h2>{{ total_profiles }}</h2>
-        </div>
+      <div class="admin-stat-card">
+        <span>Profiles</span>
+        <h2>{{ total_profiles }}</h2>
+      </div>
 
-        <div class="admin-stat-card">
-            <span>Active Users</span>
-            <h2>{{ active_users }}</h2>
-        </div>
+      <div class="admin-stat-card">
+        <span>Active Users</span>
+        <h2>{{ active_users }}</h2>
+      </div>
 
-        <div class="admin-stat-card">
-            <span>Total Chats</span>
-            <h2>{{ total_chats }}</h2>
-        </div>
+      <div class="admin-stat-card">
+        <span>Total Chats</span>
+        <h2>{{ total_chats }}</h2>
+      </div>
 
-        <div class="admin-stat-card">
-            <span>Total Messages</span>
-            <h2>{{ total_messages }}</h2>
-        </div>
+      <div class="admin-stat-card">
+        <span>Total Messages</span>
+        <h2>{{ total_messages }}</h2>
+      </div>
 
-        <div class="admin-stat-card">
-            <span>Media Messages</span>
-            <h2>{{ total_media_messages }}</h2>
-        </div>
+      <div class="admin-stat-card">
+        <span>Voice Messages</span>
+        <h2>{{ total_voice_messages }}</h2>
+      </div>
     </div>
 
     <div class="admin-section-card">
-        <div class="admin-section-title">
-            <h2>User Profiles</h2>
-            <p>Profile photo, username, full name, bio and last seen.</p>
-        </div>
+      <div class="admin-section-title">
+        <h2>User Profiles</h2>
+        <p>Profile photo, username, full name, bio and last seen.</p>
+      </div>
 
-        <div class="admin-profile-grid">
-            {% for profile in profiles %}
-                <div class="admin-profile-card">
-                    {% if profile.profile_picture %}
-                        <img src="{{ profile.profile_picture.url }}" class="admin-profile-img" alt="Profile">
-                    {% else %}
-                        <div class="admin-profile-img admin-profile-fallback">
-                            {{ profile.user.username|first|upper }}
-                        </div>
-                    {% endif %}
+      <div class="admin-profile-grid">
+        {% for profile in profiles %}
+          <div class="admin-profile-card">
+            {% if profile.profile_picture %}
+              <img src="{{ profile.profile_picture.url }}" class="admin-profile-img" alt="Profile" />
+            {% else %}
+              <div class="admin-profile-img admin-profile-fallback">{{ profile.user.username|first|upper }}</div>
+            {% endif %}
 
-                    <div class="admin-profile-info">
-                        <h3>{{ profile.user.username }}</h3>
+            <div class="admin-profile-info">
+              <h3>{{ profile.user.username }}</h3>
 
-                        <p>
-                            <strong>Name:</strong>
-                            {% if profile.full_name %}
-                                {{ profile.full_name }}
-                            {% else %}
-                                Not added
-                            {% endif %}
-                        </p>
+              <p>
+                <strong>Name:</strong>
+                {% if profile.full_name %}
+                  {{ profile.full_name }}
+                {% else %}
+                  Not added
+                {% endif %}
+              </p>
 
-                        <p>
-                            <strong>Bio:</strong>
-                            {% if profile.bio %}
-                                {{ profile.bio }}
-                            {% else %}
-                                Not added
-                            {% endif %}
-                        </p>
+              <p>
+                <strong>Bio:</strong>
+                {% if profile.bio %}
+                  {{ profile.bio }}
+                {% else %}
+                  Not added
+                {% endif %}
+              </p>
 
-                        <p>
-                            <strong>Email:</strong>
-                            {{ profile.user.email|default:"Not added" }}
-                        </p>
+              <p>
+                <strong>Email:</strong>
+                {{ profile.user.email|default:'Not added' }}
+              </p>
 
-                        <p>
-                            <strong>Status:</strong>
-                            {% if profile.last_seen %}
-                                {{ profile.last_seen|date:"d M Y, h:i A" }}
-                            {% else %}
-                                No activity
-                            {% endif %}
-                        </p>
+              <p>
+                <strong>Status:</strong>
+                {% if profile.last_seen %}
+                  {{ profile.last_seen|date:'d M Y, h:i A' }}
+                {% else %}
+                  No activity
+                {% endif %}
+              </p>
 
-                        <a href="{% url 'profile_view' profile.user.id %}" class="admin-mini-link">View Profile</a>
-                    </div>
-                </div>
-            {% empty %}
-                <p class="admin-empty-text">No profiles found.</p>
-            {% endfor %}
-        </div>
+              <a href="{% url 'profile_view' profile.user.id %}" class="admin-mini-link">View Profile</a>
+            </div>
+          </div>
+        {% empty %}
+          <p class="admin-empty-text">No profiles found.</p>
+        {% endfor %}
+      </div>
     </div>
 
     <div class="admin-two-column">
-
-        <div class="admin-section-card">
-            <div class="admin-section-title">
-                <h2>Recent Media</h2>
-                <p>Images and documents shared in chats.</p>
-            </div>
-
-            <div class="admin-table-wrap">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Media</th>
-                            <th>Sender</th>
-                            <th>Receiver</th>
-                            <th>Time</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {% for msg in recent_media_messages %}
-                            <tr>
-                                <td>
-                                    {% if msg.media_type == "image" %}
-                                        <a href="{{ msg.media_file.url }}" target="_blank">
-                                            <img src="{{ msg.media_file.url }}" class="admin-media-thumb" alt="Media">
-                                        </a>
-                                    {% else %}
-                                        <a href="{{ msg.media_file.url }}" target="_blank" class="admin-file-link">
-                                            📎 {{ msg.media_name|truncatechars:22 }}
-                                        </a>
-                                    {% endif %}
-                                </td>
-
-                                <td>{{ msg.sender.username }}</td>
-                                <td>{{ msg.receiver.username }}</td>
-                                <td>{{ msg.created_at|date:"d M, h:i A" }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="4">No media shared yet.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-        <div class="admin-section-card">
-            <div class="admin-section-title">
-                <h2>Recent Chats</h2>
-                <p>Chat rooms summary. Full messages remain inside Django admin Chat Rooms.</p>
-            </div>
-
-            <div class="admin-table-wrap">
-                <table class="admin-table">
-                    <thead>
-                        <tr>
-                            <th>Users</th>
-                            <th>Messages</th>
-                            <th>Updated</th>
-                        </tr>
-                    </thead>
-
-                    <tbody>
-                        {% for room in recent_chats %}
-                            <tr>
-                                <td>{{ room.user1.username }} ↔ {{ room.user2.username }}</td>
-                                <td>{{ room.message_count }}</td>
-                                <td>{{ room.updated_at|date:"d M, h:i A" }}</td>
-                            </tr>
-                        {% empty %}
-                            <tr>
-                                <td colspan="3">No chats found.</td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-
-    </div>
-
-    <div class="admin-section-card">
+      <div class="admin-section-card">
         <div class="admin-section-title">
-            <h2>Recent Messages</h2>
-            <p>Latest message activity preview.</p>
+          <h2>Recent Voice Notes</h2>
+          <p>Voice messages shared in chats.</p>
         </div>
 
         <div class="admin-table-wrap">
-            <table class="admin-table">
-                <thead>
-                    <tr>
-                        <th>Sender</th>
-                        <th>Receiver</th>
-                        <th>Message</th>
-                        <th>Media</th>
-                        <th>Time</th>
-                    </tr>
-                </thead>
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Media</th>
+                <th>Sender</th>
+                <th>Receiver</th>
+                <th>Time</th>
+              </tr>
+            </thead>
 
-                <tbody>
-                    {% for msg in recent_messages %}
-                        <tr>
-                            <td>{{ msg.sender.username }}</td>
-                            <td>{{ msg.receiver.username }}</td>
-                            <td>
-                                {% if msg.deleted_for_everyone %}
-                                    This message was deleted
-                                {% elif msg.message %}
-                                    {{ msg.message|truncatechars:60 }}
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if msg.media_file %}
-                                    <a href="{{ msg.media_file.url }}" target="_blank">Open</a>
-                                {% else %}
-                                    -
-                                {% endif %}
-                            </td>
-                            <td>{{ msg.created_at|date:"d M, h:i A" }}</td>
-                        </tr>
-                    {% empty %}
-                        <tr>
-                            <td colspan="5">No messages found.</td>
-                        </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+            <tbody>
+              {% for msg in recent_voice_messages %}
+                <tr>
+                  <td>
+                    {% if msg.voice_note.name %}
+                      <audio controls src="{{ msg.voice_note.url }}"></audio>
+                    {% else %}
+                      No voice file
+                    {% endif %}
+                  </td>
+                  <td>{{ msg.sender.username }}</td>
+                  <td>{{ msg.receiver.username }}</td>
+                  <td>{{ msg.created_at|date:'d M, h:i A' }}</td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="4">No voice messages yet.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
         </div>
+      </div>
+
+      <div class="admin-section-card">
+        <div class="admin-section-title">
+          <h2>Recent Chats</h2>
+          <p>Chat rooms summary. Full messages remain inside Django admin Chat Rooms.</p>
+        </div>
+
+        <div class="admin-table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>Users</th>
+                <th>Messages</th>
+                <th>Updated</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {% for room in recent_chats %}
+                <tr>
+                  <td>{{ room.user1.username }} ↔ {{ room.user2.username }}</td>
+                  <td>{{ room.message_count }}</td>
+                  <td>{{ room.updated_at|date:'d M, h:i A' }}</td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="3">No chats found.</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
     </div>
 
-</div>
+    <div class="admin-section-card">
+      <div class="admin-section-title">
+        <h2>Recent Messages</h2>
+        <p>Latest message activity preview.</p>
+      </div>
+
+      <div class="admin-table-wrap">
+        <table class="admin-table">
+          <thead>
+            <tr>
+              <th>Sender</th>
+              <th>Receiver</th>
+              <th>Message</th>
+              <th>Media</th>
+              <th>Time</th>
+            </tr>
+          </thead>
+
+          <tbody>
+            {% for msg in recent_messages %}
+              <tr>
+                <td>{{ msg.sender.username }}</td>
+                <td>{{ msg.receiver.username }}</td>
+                <td>
+                  {% if msg.deleted_for_everyone %}
+                    This message was deleted
+                  {% elif msg.message %}
+                    {{ msg.message|truncatechars:60 }}
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td>
+                  {% if msg.media_file %}
+                    <a href="{{ msg.media_file.url }}" target="_blank">Open</a>
+                  {% else %}
+                    -
+                  {% endif %}
+                </td>
+                <td>{{ msg.created_at|date:'d M, h:i A' }}</td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5">No messages found.</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 {% endblock %}

@@ -28,7 +28,19 @@
                     
                     
                     
+                    
+                    
+                    
+                    
+                    
+                    
                     online
+
+
+
+
+
+
 
 
 
@@ -38,7 +50,19 @@
                     
                     
                     
+                    
+                    
+                    
+                    
+                    
+                    
                     offline
+
+
+
+
+
+
 
 
 
@@ -106,7 +130,19 @@
                 
                 
                 
+                
+                
+                
+                
+                
+                
                 online-text
+
+
+
+
+
+
 
 
 
@@ -116,7 +152,19 @@
                 
                 
                 
+                
+                
+                
+                
+                
+                
                 offline-text
+
+
+
+
+
+
 
 
 
@@ -142,7 +190,19 @@
                 
                 
                 
+                
+                
+                
+                
+                
+                
                 outgoing
+
+
+
+
+
+
 
 
 
@@ -152,7 +212,19 @@
                 
                 
                 
+                
+                
+                
+                
+                
+                
                 incoming
+
+
+
+
+
+
 
 
 
@@ -176,19 +248,24 @@
                 {% endif %}
 
                 <p class="message-text {% if msg.deleted_for_everyone %}deleted-message-text{% endif %}">{{ msg.display_message }}</p>
-                {% if msg.media_file and not msg.deleted_for_everyone %}
-                  <div class="message-media">
-                    {% if msg.media_type == 'image' %}
-                      <a href="{{ msg.media_file.url }}" target="_blank"><img src="{{ msg.media_file.url }}" class="chat-image-preview" alt="Shared image" /></a>
-                    {% else %}
-                      <a href="{{ msg.media_file.url }}" target="_blank" class="chat-file-preview">
-                        <span>📎</span>
-                        <div>
-                          <strong>{{ msg.media_name|truncatechars:32 }}</strong>
-                          <small>Tap to open file</small>
-                        </div>
-                      </a>
-                    {% endif %}
+                {% if msg.voice_note and msg.voice_note.name and not msg.deleted_for_everyone %}
+                  <div class="voice-note-player">
+                    <button type="button" class="voice-play-btn">▶</button>
+
+                    <div class="voice-wave-wrap">
+                      <div class="voice-wave-progress"></div>
+
+                      <div class="voice-wave-bars">
+                        <span></span><span></span><span></span><span></span><span></span>
+                        <span></span><span></span><span></span><span></span><span></span>
+                        <span></span><span></span><span></span><span></span><span></span>
+                        <span></span><span></span><span></span><span></span><span></span>
+                      </div>
+                    </div>
+
+                    <span class="voice-time">{{ msg.voice_duration_text }}</span>
+
+                    <audio preload="metadata" src="{{ msg.voice_note.url }}"></audio>
                   </div>
                 {% endif %}
 
@@ -245,7 +322,7 @@
           <button type="button" id="cancelReplyBtn">×</button>
         </div>
 
-        <input type="file" id="mediaInput" name="media_file" accept="image/*,.pdf,.doc,.docx,.txt" hidden />
+        {% comment %} <input type="file" id="mediaInput" name="media_file" accept="image/*,.pdf,.doc,.docx,.txt" hidden />
 
         <div id="mediaPreview" class="media-preview" style="display: none;">
           <div>
@@ -256,7 +333,19 @@
           <button type="button" id="cancelMediaBtn">×</button>
         </div>
 
-        <button type="button" id="attachBtn" class="attach-btn">📎</button>
+        <button type="button" id="attachBtn" class="attach-btn">📎</button> {% endcomment %}
+
+        <div id="voicePreview" class="voice-preview" style="display: none;">
+          <div class="voice-preview-info">
+            <span class="voice-dot"></span>
+            <strong id="voicePreviewText">Voice note ready</strong>
+            <small id="voicePreviewDuration">0:00</small>
+          </div>
+
+          <button type="button" id="cancelVoiceBtn">×</button>
+        </div>
+
+        <button type="button" id="voiceBtn" class="voice-btn" title="Record voice message">🎙️</button>
 
         <input type="text" id="messageInput" name="message" placeholder="Type your message..." autocomplete="off" />
 
@@ -296,1391 +385,1557 @@
   </div>
 
   <script>
-    console.log("Final chat script loaded");
-
-    const roomId = "{{ room.id }}";
-    const currentUserId = Number("{{ request.user.id }}");
-    const otherUserId = Number("{{ other_user.id }}");
-
-    const chatMessages = document.getElementById("chatMessages");
-    const chatForm = document.getElementById("chatForm");
-    const messageInput = document.getElementById("messageInput");
-    const sendBtn = document.getElementById("sendBtn");
-
-    const replyToInput = document.getElementById("replyToInput");
-    const replyPreview = document.getElementById("replyPreview");
-    const replySender = document.getElementById("replySender");
-    const replyText = document.getElementById("replyText");
-    const cancelReplyBtn = document.getElementById("cancelReplyBtn");
-
-    const onlineStatus = document.getElementById("onlineStatus");
-    const typingIndicator = document.getElementById("typingIndicator");
-
-    const attachBtn = document.getElementById("attachBtn");
-    const mediaInput = document.getElementById("mediaInput");
-    const mediaPreview = document.getElementById("mediaPreview");
-    const mediaPreviewName = document.getElementById("mediaPreviewName");
-    const mediaPreviewSize = document.getElementById("mediaPreviewSize");
-    const cancelMediaBtn = document.getElementById("cancelMediaBtn");
-    const soundToggleBtn = document.getElementById("soundToggleBtn");
-
-    const messageActionOverlay = document.getElementById("messageActionOverlay");
-    const messageActionSheet = document.querySelector(".message-action-sheet");
-    const messageActionTitle = document.getElementById("messageActionTitle");
-    const menuEditBtn = document.getElementById("menuEditBtn");
-    const menuDeleteEveryoneBtn = document.getElementById("menuDeleteEveryoneBtn");
-
-    let socket = null;
-    let lastMessageId = 0;
-    let editingMessageId = null;
-    let typingTimer = null;
-    let typingHideTimer = null;
-    let lastTypingSentAt = 0;
-    let isSendingMessage = false;
-
-    let selectedMessageRow = null;
-    let longPressTimer = null;
-    let ignoreNextClick = false;
-
-    let notificationSoundEnabled = localStorage.getItem("chat_sound_enabled") !== "false";
-
+    console.log('Final chat script loaded')
+    
+    const roomId = '{{ room.id }}'
+    const currentUserId = Number('{{ request.user.id }}')
+    const otherUserId = Number('{{ other_user.id }}')
+    
+    const chatMessages = document.getElementById('chatMessages')
+    const chatForm = document.getElementById('chatForm')
+    const messageInput = document.getElementById('messageInput')
+    const sendBtn = document.getElementById('sendBtn')
+    
+    const replyToInput = document.getElementById('replyToInput')
+    const replyPreview = document.getElementById('replyPreview')
+    const replySender = document.getElementById('replySender')
+    const replyText = document.getElementById('replyText')
+    const cancelReplyBtn = document.getElementById('cancelReplyBtn')
+    
+    const onlineStatus = document.getElementById('onlineStatus')
+    const typingIndicator = document.getElementById('typingIndicator')
+    
+    const voiceBtn = document.getElementById('voiceBtn')
+    const voicePreview = document.getElementById('voicePreview')
+    const voicePreviewText = document.getElementById('voicePreviewText')
+    const voicePreviewDuration = document.getElementById('voicePreviewDuration')
+    const cancelVoiceBtn = document.getElementById('cancelVoiceBtn')
+    
+    let mediaRecorder = null
+    let recordedVoiceChunks = []
+    let recordedVoiceBlob = null
+    let recordedVoiceDuration = 0
+    let voiceRecordStartedAt = null
+    let voiceTimerInterval = null
+    let isRecordingVoice = false
+    
+    const soundToggleBtn = document.getElementById('soundToggleBtn')
+    
+    const messageActionOverlay = document.getElementById('messageActionOverlay')
+    const messageActionSheet = document.querySelector('.message-action-sheet')
+    const messageActionTitle = document.getElementById('messageActionTitle')
+    const menuEditBtn = document.getElementById('menuEditBtn')
+    const menuDeleteEveryoneBtn = document.getElementById('menuDeleteEveryoneBtn')
+    
+    let socket = null
+    let lastMessageId = 0
+    let editingMessageId = null
+    let typingTimer = null
+    let typingHideTimer = null
+    let lastTypingSentAt = 0
+    let isSendingMessage = false
+    
+    let selectedMessageRow = null
+    let longPressTimer = null
+    let ignoreNextClick = false
+    
+    let notificationSoundEnabled = localStorage.getItem('chat_sound_enabled') !== 'false'
+    
     function setMobileAppHeight() {
-        document.documentElement.style.setProperty("--app-height", `${window.innerHeight}px`);
+      document.documentElement.style.setProperty('--app-height', `${window.innerHeight}px`)
     }
-
-    setMobileAppHeight();
-
+    
+    setMobileAppHeight()
+    
     function getCookie(name) {
-        let cookieValue = null;
-
-        if (document.cookie && document.cookie !== "") {
-            const cookies = document.cookie.split(";");
-
-            for (let i = 0; i < cookies.length; i++) {
-                const cookie = cookies[i].trim();
-
-                if (cookie.substring(0, name.length + 1) === (name + "=")) {
-                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                    break;
-                }
-            }
+      let cookieValue = null
+    
+      if (document.cookie && document.cookie !== '') {
+        const cookies = document.cookie.split(';')
+    
+        for (let i = 0; i < cookies.length; i++) {
+          const cookie = cookies[i].trim()
+    
+          if (cookie.substring(0, name.length + 1) === name + '=') {
+            cookieValue = decodeURIComponent(cookie.substring(name.length + 1))
+            break
+          }
         }
-
-        return cookieValue;
+      }
+    
+      return cookieValue
     }
-
-    const csrftoken = getCookie("csrftoken");
-
+    
+    const csrftoken = getCookie('csrftoken')
+    
     function clearTextSelection() {
-        if (window.getSelection) {
-            const selection = window.getSelection();
-
-            if (selection && selection.removeAllRanges) {
-                selection.removeAllRanges();
-            }
+      if (window.getSelection) {
+        const selection = window.getSelection()
+    
+        if (selection && selection.removeAllRanges) {
+          selection.removeAllRanges()
         }
+      }
     }
-
+    
     function truncateText(text, limit) {
-        if (!text) {
-            return "";
-        }
-
-        if (text.length > limit) {
-            return text.substring(0, limit) + "...";
-        }
-
-        return text;
+      if (!text) {
+        return ''
+      }
+    
+      if (text.length > limit) {
+        return text.substring(0, limit) + '...'
+      }
+    
+      return text
     }
-
-    function formatFileSize(bytes) {
-        if (!bytes) {
-            return "";
-        }
-
-        if (bytes < 1024 * 1024) {
-            return `${Math.round(bytes / 1024)} KB`;
-        }
-
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-    }
-
+    
     function getHighestMessageId() {
-        const rows = document.querySelectorAll("[data-message-id]");
-        let maxId = 0;
-
-        rows.forEach(function (row) {
-            const id = Number(row.dataset.messageId);
-
-            if (!Number.isNaN(id) && id > maxId) {
-                maxId = id;
-            }
-        });
-
-        return maxId;
+      const rows = document.querySelectorAll('[data-message-id]')
+      let maxId = 0
+    
+      rows.forEach(function (row) {
+        const id = Number(row.dataset.messageId)
+    
+        if (!Number.isNaN(id) && id > maxId) {
+          maxId = id
+        }
+      })
+    
+      return maxId
     }
-
-    lastMessageId = getHighestMessageId();
-
+    
+    lastMessageId = getHighestMessageId()
+    
     function scrollToBottom() {
-        if (chatMessages) {
-            chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
+      if (chatMessages) {
+        chatMessages.scrollTop = chatMessages.scrollHeight
+      }
     }
-
+    
     function instantScrollToBottom() {
-        requestAnimationFrame(function () {
-            scrollToBottom();
-        });
+      requestAnimationFrame(function () {
+        scrollToBottom()
+      })
     }
-
+    
     function focusMessageInput() {
-        setTimeout(function () {
-            if (messageInput) {
-                messageInput.focus({ preventScroll: true });
-            }
-        }, 40);
-    }
-
-    function removeEmptyChatBox() {
-        const emptyChatBox = document.getElementById("emptyChatBox");
-
-        if (emptyChatBox) {
-            emptyChatBox.remove();
-        }
-    }
-
-    function showEmptyChatIfNeeded() {
-        const rows = chatMessages.querySelectorAll(".bubble-row");
-
-        if (rows.length === 0) {
-            chatMessages.innerHTML = `
-                <div class="empty-chat" id="emptyChatBox">
-                    <div class="empty-icon">💬</div>
-                    <h3>No messages yet</h3>
-                    <p>Start the conversation by sending a message.</p>
-                </div>
-            `;
-        }
-    }
-
-    function clearReply() {
-        if (!replyToInput || !replyPreview) {
-            return;
-        }
-
-        replyToInput.value = "";
-        replyPreview.style.display = "none";
-
-        if (replySender) {
-            replySender.textContent = "";
-        }
-
-        if (replyText) {
-            replyText.textContent = "";
-        }
-    }
-
-    function clearEditMode() {
-        editingMessageId = null;
-
+      setTimeout(function () {
         if (messageInput) {
-            messageInput.value = "";
-            messageInput.placeholder = "Type your message...";
+          messageInput.focus({ preventScroll: true })
         }
-
-        if (sendBtn) {
-            sendBtn.textContent = "Send";
-        }
+      }, 40)
     }
-
-    function resetMediaInput() {
-        if (mediaInput) {
-            mediaInput.value = "";
-        }
-
-        if (mediaPreview) {
-            mediaPreview.style.display = "none";
-        }
-
-        if (mediaPreviewName) {
-            mediaPreviewName.textContent = "";
-        }
-
-        if (mediaPreviewSize) {
-            mediaPreviewSize.textContent = "";
-        }
+    
+    function removeEmptyChatBox() {
+      const emptyChatBox = document.getElementById('emptyChatBox')
+    
+      if (emptyChatBox) {
+        emptyChatBox.remove()
+      }
     }
-
-    function showMediaPreview(file) {
-        if (!file) {
-            resetMediaInput();
-            return;
-        }
-
-        if (mediaPreviewName) {
-            mediaPreviewName.textContent = file.name;
-        }
-
-        if (mediaPreviewSize) {
-            mediaPreviewSize.textContent = formatFileSize(file.size);
-        }
-
-        if (mediaPreview) {
-            mediaPreview.style.display = "flex";
-        }
+    
+    function showEmptyChatIfNeeded() {
+      const rows = chatMessages.querySelectorAll('.bubble-row')
+    
+      if (rows.length === 0) {
+        chatMessages.innerHTML = `
+                                        <div class="empty-chat" id="emptyChatBox">
+                                            <div class="empty-icon">💬</div>
+                                            <h3>No messages yet</h3>
+                                            <p>Start the conversation by sending a message.</p>
+                                        </div>
+                                    `
+      }
     }
-
+    
+    function clearReply() {
+      if (!replyToInput || !replyPreview) {
+        return
+      }
+    
+      replyToInput.value = ''
+      replyPreview.style.display = 'none'
+    
+      if (replySender) {
+        replySender.textContent = ''
+      }
+    
+      if (replyText) {
+        replyText.textContent = ''
+      }
+    }
+    
+    function clearEditMode() {
+      editingMessageId = null
+    
+      if (messageInput) {
+        messageInput.value = ''
+        messageInput.placeholder = 'Type your message...'
+      }
+    
+      if (sendBtn) {
+        sendBtn.textContent = 'Send'
+      }
+    }
+    
     function afterMessageAction() {
-        clearReply();
-        clearEditMode();
-        resetMediaInput();
-        scrollToBottom();
-        focusMessageInput();
+      clearReply()
+      clearEditMode()
+      resetMediaInput()
+      scrollToBottom()
+      focusMessageInput()
     }
-
+    
     function createButton(className, text, messageId) {
-        const button = document.createElement("button");
-        button.type = "button";
-        button.className = className;
-        button.textContent = text;
-        button.dataset.messageId = messageId;
-
-        return button;
+      const button = document.createElement('button')
+      button.type = 'button'
+      button.className = className
+      button.textContent = text
+      button.dataset.messageId = messageId
+    
+      return button
+    }
+    
+    function formatVoiceTime(seconds) {
+      seconds = Math.max(0, Math.floor(seconds || 0))
+    
+      const minutes = Math.floor(seconds / 60)
+      const remainingSeconds = seconds % 60
+    
+      return `${minutes}:${String(remainingSeconds).padStart(2, '0')}`
+    }
+    
+    function resetVoiceNote() {
+      recordedVoiceChunks = []
+      recordedVoiceBlob = null
+      recordedVoiceDuration = 0
+      voiceRecordStartedAt = null
+    
+      if (voicePreview) {
+        voicePreview.style.display = 'none'
+      }
+    
+      if (voicePreviewText) {
+        voicePreviewText.textContent = 'Voice note ready'
+      }
+    
+      if (voicePreviewDuration) {
+        voicePreviewDuration.textContent = '0:00'
+      }
+    
+      if (voiceBtn) {
+        voiceBtn.textContent = '🎙️'
+        voiceBtn.classList.remove('recording')
+      }
+    
+      clearInterval(voiceTimerInterval)
+    }
+    
+    function showVoicePreview() {
+      if (!voicePreview) {
+        return
+      }
+    
+      voicePreview.style.display = 'flex'
+    
+      if (voicePreviewText) {
+        voicePreviewText.textContent = 'Voice note ready'
+      }
+    
+      if (voicePreviewDuration) {
+        voicePreviewDuration.textContent = formatVoiceTime(recordedVoiceDuration)
+      }
+    }
+    
+    function appendVoiceToBubble(bubble, data) {
+    if (!data || !data.has_voice || !data.voice_url) {
+        return;
     }
 
-    function appendMediaToBubble(bubble, data) {
-        if (!data || !data.has_media || !data.media_url) {
+    const voiceBox = document.createElement("div");
+    voiceBox.className = "voice-note-player";
+
+    const playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className = "voice-play-btn";
+    playBtn.textContent = "▶";
+
+    const waveWrap = document.createElement("div");
+    waveWrap.className = "voice-wave-wrap";
+
+    const waveProgress = document.createElement("div");
+    waveProgress.className = "voice-wave-progress";
+
+    const waveBars = document.createElement("div");
+    waveBars.className = "voice-wave-bars";
+
+    for (let i = 0; i < 20; i++) {
+        const bar = document.createElement("span");
+        waveBars.appendChild(bar);
+    }
+
+    waveWrap.appendChild(waveProgress);
+    waveWrap.appendChild(waveBars);
+
+    const time = document.createElement("span");
+    time.className = "voice-time";
+    time.textContent = data.voice_duration_text || "0:00";
+
+    const audio = document.createElement("audio");
+    audio.preload = "metadata";
+    audio.src = data.voice_url;
+
+    voiceBox.appendChild(playBtn);
+    voiceBox.appendChild(waveWrap);
+    voiceBox.appendChild(time);
+    voiceBox.appendChild(audio);
+
+    bubble.appendChild(voiceBox);
+
+    setupVoicePlayer(voiceBox);
+    }
+    
+    function appendTempVoiceToBubble(bubble, voiceBlob, durationValue) {
+    if (!voiceBlob) {
+        return;
+    }
+
+    const voiceBox = document.createElement("div");
+    voiceBox.className = "voice-note-player";
+
+    const playBtn = document.createElement("button");
+    playBtn.type = "button";
+    playBtn.className = "voice-play-btn";
+    playBtn.textContent = "▶";
+
+    const waveWrap = document.createElement("div");
+    waveWrap.className = "voice-wave-wrap";
+
+    const waveProgress = document.createElement("div");
+    waveProgress.className = "voice-wave-progress";
+
+    const waveBars = document.createElement("div");
+    waveBars.className = "voice-wave-bars";
+
+    for (let i = 0; i < 20; i++) {
+        const bar = document.createElement("span");
+        waveBars.appendChild(bar);
+    }
+
+    waveWrap.appendChild(waveProgress);
+    waveWrap.appendChild(waveBars);
+
+    const time = document.createElement("span");
+    time.className = "voice-time";
+    time.textContent = formatVoiceTime(durationValue);
+
+    const audio = document.createElement("audio");
+    audio.preload = "metadata";
+    audio.src = URL.createObjectURL(voiceBlob);
+
+    voiceBox.appendChild(playBtn);
+    voiceBox.appendChild(waveWrap);
+    voiceBox.appendChild(time);
+    voiceBox.appendChild(audio);
+
+    bubble.appendChild(voiceBox);
+
+    setupVoicePlayer(voiceBox);
+    }
+
+    function pauseAllVoiceNotes(exceptAudio) {
+    const allAudios = document.querySelectorAll(".voice-note-player audio");
+
+    allAudios.forEach(function (audio) {
+        if (audio !== exceptAudio) {
+            audio.pause();
+        }
+    });
+}
+
+function setupVoicePlayer(player) {
+    if (!player || player.dataset.ready === "true") {
+        return;
+    }
+
+    const audio = player.querySelector("audio");
+    const playBtn = player.querySelector(".voice-play-btn");
+    const progress = player.querySelector(".voice-wave-progress");
+    const timeLabel = player.querySelector(".voice-time");
+
+    if (!audio || !playBtn || !progress || !timeLabel) {
+        return;
+    }
+
+    player.dataset.ready = "true";
+
+    playBtn.addEventListener("click", function (event) {
+        event.stopPropagation();
+
+        if (audio.paused) {
+            pauseAllVoiceNotes(audio);
+            audio.play();
+        } else {
+            audio.pause();
+        }
+    });
+
+    audio.addEventListener("play", function () {
+        player.classList.add("playing");
+        playBtn.textContent = "⏸";
+    });
+
+    audio.addEventListener("pause", function () {
+        player.classList.remove("playing");
+        playBtn.textContent = "▶";
+    });
+
+    audio.addEventListener("ended", function () {
+        player.classList.remove("playing");
+        playBtn.textContent = "▶";
+        progress.style.width = "0%";
+        audio.currentTime = 0;
+    });
+
+    audio.addEventListener("timeupdate", function () {
+        if (!audio.duration) {
             return;
         }
 
-        const mediaBox = document.createElement("div");
-        mediaBox.className = "message-media";
+        const percentage = (audio.currentTime / audio.duration) * 100;
+        progress.style.width = `${percentage}%`;
 
-        if (data.media_type === "image") {
-            const link = document.createElement("a");
-            link.href = data.media_url;
-            link.target = "_blank";
+        timeLabel.textContent = formatVoiceTime(audio.currentTime);
+    });
 
-            const img = document.createElement("img");
-            img.src = data.media_url;
-            img.className = "chat-image-preview";
-            img.alt = "Shared image";
-
-            link.appendChild(img);
-            mediaBox.appendChild(link);
-        } else {
-            const link = document.createElement("a");
-            link.href = data.media_url;
-            link.target = "_blank";
-            link.className = "chat-file-preview";
-
-            const icon = document.createElement("span");
-            icon.textContent = "📎";
-
-            const info = document.createElement("div");
-
-            const name = document.createElement("strong");
-            name.textContent = data.media_name || "File";
-
-            const small = document.createElement("small");
-            small.textContent = "Tap to open file";
-
-            info.appendChild(name);
-            info.appendChild(small);
-
-            link.appendChild(icon);
-            link.appendChild(info);
-
-            mediaBox.appendChild(link);
+    audio.addEventListener("loadedmetadata", function () {
+        if (audio.duration && timeLabel.textContent === "0:00") {
+            timeLabel.textContent = formatVoiceTime(audio.duration);
         }
-
-        bubble.appendChild(mediaBox);
+    });
     }
 
-    function appendTempMediaToBubble(bubble, file) {
-        if (!file) {
-            return;
-        }
+    function initializeVoicePlayers(root = document) {
+        const players = root.querySelectorAll(".voice-note-player");
 
-        const mediaBox = document.createElement("div");
-        mediaBox.className = "message-media";
-
-        if (file.type && file.type.startsWith("image/")) {
-            const img = document.createElement("img");
-            img.src = URL.createObjectURL(file);
-            img.className = "chat-image-preview";
-            img.alt = "Selected image";
-
-            mediaBox.appendChild(img);
-        } else {
-            const fileBox = document.createElement("div");
-            fileBox.className = "chat-file-preview";
-
-            const icon = document.createElement("span");
-            icon.textContent = "📎";
-
-            const info = document.createElement("div");
-
-            const name = document.createElement("strong");
-            name.textContent = file.name;
-
-            const small = document.createElement("small");
-            small.textContent = "Sending file...";
-
-            info.appendChild(name);
-            info.appendChild(small);
-
-            fileBox.appendChild(icon);
-            fileBox.appendChild(info);
-
-            mediaBox.appendChild(fileBox);
-        }
-
-        bubble.appendChild(mediaBox);
+        players.forEach(function (player) {
+        setupVoicePlayer(player);
+    });
     }
-
-    function addTempMessageToScreen(tempId, messageTextValue, mediaFileValue) {
-        removeEmptyChatBox();
-
-        const row = document.createElement("div");
-        row.className = "bubble-row outgoing";
-        row.dataset.messageId = tempId;
-        row.dataset.senderId = currentUserId;
-        row.dataset.tempMessage = "true";
-
-        const bubble = document.createElement("div");
-        bubble.className = "bubble";
-
-        if (replyToInput && replyToInput.value) {
-            const replyBox = document.createElement("div");
-            replyBox.className = "reply-box";
-
-            const replySenderName = document.createElement("span");
-            replySenderName.textContent = replySender ? replySender.textContent : "";
-
-            const replyMsg = document.createElement("p");
-            replyMsg.textContent = truncateText(replyText ? replyText.textContent : "", 80);
-
-            replyBox.appendChild(replySenderName);
-            replyBox.appendChild(replyMsg);
-            bubble.appendChild(replyBox);
+    
+    async function startVoiceRecording() {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        console.log('Voice recording is not supported in this browser.')
+        return
+      }
+    
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    
+        recordedVoiceChunks = []
+    
+        mediaRecorder = new MediaRecorder(stream)
+    
+        mediaRecorder.ondataavailable = function (event) {
+          if (event.data && event.data.size > 0) {
+            recordedVoiceChunks.push(event.data)
+          }
         }
-
-        if (messageTextValue) {
-            const messageText = document.createElement("p");
-            messageText.className = "message-text";
-            messageText.textContent = messageTextValue;
-            bubble.appendChild(messageText);
+    
+        mediaRecorder.onstop = function () {
+          stream.getTracks().forEach(function (track) {
+            track.stop()
+          })
+    
+          recordedVoiceDuration = Math.max(1, Math.round((Date.now() - voiceRecordStartedAt) / 1000))
+    
+          recordedVoiceBlob = new Blob(recordedVoiceChunks, {
+            type: 'audio/webm'
+          })
+    
+          isRecordingVoice = false
+    
+          if (voiceBtn) {
+            voiceBtn.textContent = '🎙️'
+            voiceBtn.classList.remove('recording')
+          }
+    
+          clearInterval(voiceTimerInterval)
+          showVoicePreview()
+          focusMessageInput()
         }
-
-        appendTempMediaToBubble(bubble, mediaFileValue);
-
-        const small = document.createElement("small");
-        small.appendChild(document.createTextNode("Now "));
-
-        const statusSpan = document.createElement("span");
-        statusSpan.className = "message-status";
-        statusSpan.dataset.messageStatus = "";
-        statusSpan.textContent = "Sending...";
-
-        small.appendChild(statusSpan);
-        bubble.appendChild(small);
-
-        row.appendChild(bubble);
-        chatMessages.appendChild(row);
-
-        scrollToBottom();
+    
+        mediaRecorder.start()
+    
+        isRecordingVoice = true
+        voiceRecordStartedAt = Date.now()
+    
+        if (voiceBtn) {
+          voiceBtn.textContent = '⏹️'
+          voiceBtn.classList.add('recording')
+        }
+    
+        if (voicePreview) {
+          voicePreview.style.display = 'flex'
+        }
+    
+        if (voicePreviewText) {
+          voicePreviewText.textContent = 'Recording...'
+        }
+    
+        voiceTimerInterval = setInterval(function () {
+          const seconds = Math.round((Date.now() - voiceRecordStartedAt) / 1000)
+    
+          if (voicePreviewDuration) {
+            voicePreviewDuration.textContent = formatVoiceTime(seconds)
+          }
+    
+          if (seconds >= 120) {
+            stopVoiceRecording()
+          }
+        }, 400)
+      } catch (error) {
+        console.log('Microphone permission error:', error)
+      }
     }
-
+    
+    function stopVoiceRecording() {
+      if (mediaRecorder && mediaRecorder.state === 'recording') {
+        mediaRecorder.stop()
+      }
+    }
+    
+    function addTempMessageToScreen(tempId, messageTextValue, voiceBlobValue, voiceDurationValue) {
+      removeEmptyChatBox()
+    
+      const row = document.createElement('div')
+      row.className = 'bubble-row outgoing'
+      row.dataset.messageId = tempId
+      row.dataset.senderId = currentUserId
+      row.dataset.tempMessage = 'true'
+    
+      const bubble = document.createElement('div')
+      bubble.className = 'bubble'
+    
+      if (replyToInput && replyToInput.value) {
+        const replyBox = document.createElement('div')
+        replyBox.className = 'reply-box'
+    
+        const replySenderName = document.createElement('span')
+        replySenderName.textContent = replySender ? replySender.textContent : ''
+    
+        const replyMsg = document.createElement('p')
+        replyMsg.textContent = truncateText(replyText ? replyText.textContent : '', 80)
+    
+        replyBox.appendChild(replySenderName)
+        replyBox.appendChild(replyMsg)
+        bubble.appendChild(replyBox)
+      }
+    
+      if (messageTextValue) {
+        const messageText = document.createElement('p')
+        messageText.className = 'message-text'
+        messageText.textContent = messageTextValue
+        bubble.appendChild(messageText)
+      }
+    
+      appendTempVoiceToBubble(bubble, voiceBlobValue, voiceDurationValue)
+    
+      const small = document.createElement('small')
+      small.appendChild(document.createTextNode('Now '))
+    
+      const statusSpan = document.createElement('span')
+      statusSpan.className = 'message-status'
+      statusSpan.dataset.messageStatus = ''
+      statusSpan.textContent = 'Sending...'
+    
+      small.appendChild(statusSpan)
+      bubble.appendChild(small)
+    
+      row.appendChild(bubble)
+      chatMessages.appendChild(row)
+    
+      scrollToBottom()
+    }
+    
     function removeTempMessage(tempId) {
-        const tempRow = document.querySelector(`[data-message-id="${tempId}"]`);
-
-        if (tempRow) {
-            tempRow.remove();
-        }
+      const tempRow = document.querySelector(`[data-message-id="${tempId}"]`)
+    
+      if (tempRow) {
+        tempRow.remove()
+      }
     }
-
+    
     function markTempMessageFailed(tempId) {
-        const tempRow = document.querySelector(`[data-message-id="${tempId}"]`);
-
-        if (!tempRow) {
-            return;
-        }
-
-        const statusSpan = tempRow.querySelector("[data-message-status]");
-
-        if (statusSpan) {
-            statusSpan.textContent = "Failed";
-        }
-
-        tempRow.style.opacity = "0.65";
+      const tempRow = document.querySelector(`[data-message-id="${tempId}"]`)
+    
+      if (!tempRow) {
+        return
+      }
+    
+      const statusSpan = tempRow.querySelector('[data-message-status]')
+    
+      if (statusSpan) {
+        statusSpan.textContent = 'Failed'
+      }
+    
+      tempRow.style.opacity = '0.65'
     }
-
+    
     function addMessageToScreen(data) {
-        const existingRow = document.querySelector(`[data-message-id="${data.message_id}"]`);
-
-        if (existingRow) {
-            updateMessageOnScreen(data);
-            return;
-        }
-
-        removeEmptyChatBox();
-
-        const isOutgoing = Number(data.sender_id) === currentUserId;
-
-        const row = document.createElement("div");
-        row.className = isOutgoing ? "bubble-row outgoing" : "bubble-row incoming";
-        row.dataset.messageId = data.message_id;
-        row.dataset.senderId = data.sender_id;
-
-        const bubble = document.createElement("div");
-        bubble.className = "bubble";
-
-        if (data.reply_to) {
-            const replyBox = document.createElement("div");
-            replyBox.className = "reply-box";
-
-            const replySenderName = document.createElement("span");
-            replySenderName.textContent = data.reply_to.sender_username;
-
-            const replyMsg = document.createElement("p");
-            replyMsg.textContent = truncateText(data.reply_to.message, 80);
-
-            replyBox.appendChild(replySenderName);
-            replyBox.appendChild(replyMsg);
-            bubble.appendChild(replyBox);
-        }
-
-        if (data.message) {
-            const messageText = document.createElement("p");
-            messageText.className = "message-text";
-
-            if (data.is_deleted_for_everyone) {
-                messageText.classList.add("deleted-message-text");
-            }
-
-            messageText.textContent = data.message;
-            bubble.appendChild(messageText);
-        }
-
-        appendMediaToBubble(bubble, data);
-
-        const small = document.createElement("small");
-        small.appendChild(document.createTextNode(data.created_at || ""));
-
-        if (data.is_edited && !data.is_deleted_for_everyone) {
-            small.appendChild(document.createTextNode(" • edited"));
-        }
-
-        if (isOutgoing) {
-            small.appendChild(document.createTextNode(" "));
-
-            const statusSpan = document.createElement("span");
-            statusSpan.className = "message-status";
-            statusSpan.dataset.messageStatus = "";
-            statusSpan.textContent = data.status_text || "Sent";
-
-            small.appendChild(statusSpan);
-        }
-
-        bubble.appendChild(small);
-
-        if (!data.is_deleted_for_everyone) {
-            const actions = document.createElement("div");
-            actions.className = "message-actions";
-
-            const replyBtn = createButton("reply-btn", "Reply", data.message_id);
-            replyBtn.dataset.messageText = data.original_message || data.message || "";
-            replyBtn.dataset.sender = data.sender_username;
-
-            actions.appendChild(replyBtn);
-
-            if (isOutgoing) {
-                const editBtn = createButton("edit-btn", "Edit", data.message_id);
-                editBtn.dataset.messageText = data.original_message || data.message || "";
-                actions.appendChild(editBtn);
-            }
-
-            const deleteMeBtn = createButton("delete-me-btn", "Delete me", data.message_id);
-            actions.appendChild(deleteMeBtn);
-
-            if (isOutgoing) {
-                const deleteEveryoneBtn = createButton("delete-everyone-btn", "Delete all", data.message_id);
-                actions.appendChild(deleteEveryoneBtn);
-            }
-
-            bubble.appendChild(actions);
-        }
-
-        row.appendChild(bubble);
-        chatMessages.appendChild(row);
-
-        if (Number(data.message_id) > lastMessageId) {
-            lastMessageId = Number(data.message_id);
-        }
-
-        scrollToBottom();
-    }
-
-    function updateMessageOnScreen(data) {
-        const row = document.querySelector(`[data-message-id="${data.message_id}"]`);
-
-        if (!row) {
-            return;
-        }
-
-        const messageText = row.querySelector(".message-text");
-        const small = row.querySelector("small");
-
-        if (messageText) {
-            messageText.textContent = data.message || "";
-
-            if (data.is_deleted_for_everyone) {
-                messageText.classList.add("deleted-message-text");
-            }
-        }
-
-        if (small) {
-            small.innerHTML = "";
-            small.appendChild(document.createTextNode(data.created_at || ""));
-
-            if (data.is_edited && !data.is_deleted_for_everyone) {
-                small.appendChild(document.createTextNode(" • edited"));
-            }
-
-            if (Number(data.sender_id) === currentUserId) {
-                small.appendChild(document.createTextNode(" "));
-
-                const statusSpan = document.createElement("span");
-                statusSpan.className = "message-status";
-                statusSpan.dataset.messageStatus = "";
-                statusSpan.textContent = data.status_text || "Sent";
-                small.appendChild(statusSpan);
-            }
-        }
-
+      const existingRow = document.querySelector(`[data-message-id="${data.message_id}"]`)
+    
+      if (existingRow) {
+        updateMessageOnScreen(data)
+        return
+      }
+    
+      removeEmptyChatBox()
+    
+      const isOutgoing = Number(data.sender_id) === currentUserId
+    
+      const row = document.createElement('div')
+      row.className = isOutgoing ? 'bubble-row outgoing' : 'bubble-row incoming'
+      row.dataset.messageId = data.message_id
+      row.dataset.senderId = data.sender_id
+    
+      const bubble = document.createElement('div')
+      bubble.className = 'bubble'
+    
+      if (data.reply_to) {
+        const replyBox = document.createElement('div')
+        replyBox.className = 'reply-box'
+    
+        const replySenderName = document.createElement('span')
+        replySenderName.textContent = data.reply_to.sender_username
+    
+        const replyMsg = document.createElement('p')
+        replyMsg.textContent = truncateText(data.reply_to.message, 80)
+    
+        replyBox.appendChild(replySenderName)
+        replyBox.appendChild(replyMsg)
+        bubble.appendChild(replyBox)
+      }
+    
+      if (data.message) {
+        const messageText = document.createElement('p')
+        messageText.className = 'message-text'
+    
         if (data.is_deleted_for_everyone) {
-            const actions = row.querySelector(".message-actions");
-
-            if (actions) {
-                actions.remove();
-            }
+          messageText.classList.add('deleted-message-text')
         }
+    
+        messageText.textContent = data.message
+        bubble.appendChild(messageText)
+      }
+    
+      appendVoiceToBubble(bubble, data)
+    
+      const small = document.createElement('small')
+      small.appendChild(document.createTextNode(data.created_at || ''))
+    
+      if (data.is_edited && !data.is_deleted_for_everyone) {
+        small.appendChild(document.createTextNode(' • edited'))
+      }
+    
+      if (isOutgoing) {
+        small.appendChild(document.createTextNode(' '))
+    
+        const statusSpan = document.createElement('span')
+        statusSpan.className = 'message-status'
+        statusSpan.dataset.messageStatus = ''
+        statusSpan.textContent = data.status_text || 'Sent'
+    
+        small.appendChild(statusSpan)
+      }
+    
+      bubble.appendChild(small)
+    
+      if (!data.is_deleted_for_everyone) {
+        const actions = document.createElement('div')
+        actions.className = 'message-actions'
+    
+        const replyBtn = createButton('reply-btn', 'Reply', data.message_id)
+        replyBtn.dataset.messageText = data.original_message || data.message || ''
+        replyBtn.dataset.sender = data.sender_username
+    
+        actions.appendChild(replyBtn)
+    
+        if (isOutgoing) {
+          const editBtn = createButton('edit-btn', 'Edit', data.message_id)
+          editBtn.dataset.messageText = data.original_message || data.message || ''
+          actions.appendChild(editBtn)
+        }
+    
+        const deleteMeBtn = createButton('delete-me-btn', 'Delete me', data.message_id)
+        actions.appendChild(deleteMeBtn)
+    
+        if (isOutgoing) {
+          const deleteEveryoneBtn = createButton('delete-everyone-btn', 'Delete all', data.message_id)
+          actions.appendChild(deleteEveryoneBtn)
+        }
+    
+        bubble.appendChild(actions)
+      }
+    
+      row.appendChild(bubble)
+      chatMessages.appendChild(row)
+    
+      if (Number(data.message_id) > lastMessageId) {
+        lastMessageId = Number(data.message_id)
+      }
+    
+      scrollToBottom()
     }
-
-    function markMessageDeletedForEveryone(data) {
-        const row = document.querySelector(`[data-message-id="${data.message_id}"]`);
-
-        if (!row) {
-            return;
+    
+    function updateMessageOnScreen(data) {
+      const row = document.querySelector(`[data-message-id="${data.message_id}"]`)
+    
+      if (!row) {
+        return
+      }
+    
+      const messageText = row.querySelector('.message-text')
+      const small = row.querySelector('small')
+    
+      if (messageText) {
+        messageText.textContent = data.message || ''
+    
+        if (data.is_deleted_for_everyone) {
+          messageText.classList.add('deleted-message-text')
         }
-
-        const messageText = row.querySelector(".message-text");
-
-        if (messageText) {
-            messageText.textContent = "This message was deleted";
-            messageText.classList.add("deleted-message-text");
+      }
+    
+      if (small) {
+        small.innerHTML = ''
+        small.appendChild(document.createTextNode(data.created_at || ''))
+    
+        if (data.is_edited && !data.is_deleted_for_everyone) {
+          small.appendChild(document.createTextNode(' • edited'))
         }
-
-        const actions = row.querySelector(".message-actions");
-
+    
+        if (Number(data.sender_id) === currentUserId) {
+          small.appendChild(document.createTextNode(' '))
+    
+          const statusSpan = document.createElement('span')
+          statusSpan.className = 'message-status'
+          statusSpan.dataset.messageStatus = ''
+          statusSpan.textContent = data.status_text || 'Sent'
+          small.appendChild(statusSpan)
+        }
+      }
+    
+      if (data.is_deleted_for_everyone) {
+        const actions = row.querySelector('.message-actions')
+    
         if (actions) {
-            actions.remove();
+          actions.remove()
         }
+      }
     }
-
+    
+    function markMessageDeletedForEveryone(data) {
+      const row = document.querySelector(`[data-message-id="${data.message_id}"]`)
+    
+      if (!row) {
+        return
+      }
+    
+      const messageText = row.querySelector('.message-text')
+    
+      if (messageText) {
+        messageText.textContent = 'This message was deleted'
+        messageText.classList.add('deleted-message-text')
+      }
+    
+      const actions = row.querySelector('.message-actions')
+    
+      if (actions) {
+        actions.remove()
+      }
+    }
+    
     function updateMessageStatuses(messageIds, statusText) {
-        messageIds.forEach(function (messageId) {
-            const row = document.querySelector(`[data-message-id="${messageId}"]`);
-
-            if (!row) {
-                return;
-            }
-
-            const senderId = Number(row.dataset.senderId);
-
-            if (senderId !== currentUserId) {
-                return;
-            }
-
-            const statusSpan = row.querySelector("[data-message-status]");
-
-            if (statusSpan) {
-                statusSpan.textContent = statusText;
-            }
-        });
-    }
-
-    async function sendMessageByApi(messageTextValue, replyToIdValue, mediaFileValue) {
-        const formData = new FormData();
-        formData.append("message", messageTextValue || "");
-        formData.append("reply_to_id", replyToIdValue || "");
-
-        if (mediaFileValue) {
-            formData.append("media_file", mediaFileValue);
+      messageIds.forEach(function (messageId) {
+        const row = document.querySelector(`[data-message-id="${messageId}"]`)
+    
+        if (!row) {
+          return
         }
-
-        const response = await fetch(`/chat/${roomId}/send/`, {
-            method: "POST",
-            headers: {
-                "X-CSRFToken": csrftoken
-            },
-            body: formData
-        });
-
-        return await response.json();
+    
+        const senderId = Number(row.dataset.senderId)
+    
+        if (senderId !== currentUserId) {
+          return
+        }
+    
+        const statusSpan = row.querySelector('[data-message-status]')
+    
+        if (statusSpan) {
+          statusSpan.textContent = statusText
+        }
+      })
     }
-
+    
+    async function sendMessageByApi(messageTextValue, replyToIdValue, voiceBlobValue, voiceDurationValue) {
+      const formData = new FormData()
+      formData.append('message', messageTextValue || '')
+      formData.append('reply_to_id', replyToIdValue || '')
+    
+      if (voiceBlobValue) {
+        formData.append('voice_note', voiceBlobValue, `voice-${Date.now()}.webm`)
+        formData.append('voice_duration', String(voiceDurationValue || 0))
+      }
+    
+      const response = await fetch(`/chat/${roomId}/send/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrftoken
+        },
+        body: formData
+      })
+    
+      return await response.json()
+    }
+    
     async function editMessageByApi(messageId, messageTextValue) {
-        const formData = new FormData();
-        formData.append("message", messageTextValue);
-
-        const response = await fetch(`/chat/${roomId}/edit/${messageId}/`, {
-            method: "POST",
-            headers: {
-                "X-CSRFToken": csrftoken
-            },
-            body: formData
-        });
-
-        return await response.json();
+      const formData = new FormData()
+      formData.append('message', messageTextValue)
+    
+      const response = await fetch(`/chat/${roomId}/edit/${messageId}/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrftoken
+        },
+        body: formData
+      })
+    
+      return await response.json()
     }
-
+    
     async function deleteMessageByApi(messageId, deleteType) {
-        const formData = new FormData();
-        formData.append("delete_type", deleteType);
-
-        const response = await fetch(`/chat/${roomId}/delete/${messageId}/`, {
-            method: "POST",
-            headers: {
-                "X-CSRFToken": csrftoken
-            },
-            body: formData
-        });
-
-        return await response.json();
+      const formData = new FormData()
+      formData.append('delete_type', deleteType)
+    
+      const response = await fetch(`/chat/${roomId}/delete/${messageId}/`, {
+        method: 'POST',
+        headers: {
+          'X-CSRFToken': csrftoken
+        },
+        body: formData
+      })
+    
+      return await response.json()
     }
-
+    
     async function fetchNewMessages() {
-        try {
-            const response = await fetch(`/chat/${roomId}/messages/?after_id=${lastMessageId}`);
-            const data = await response.json();
-
-            if (!data.success) {
-                return;
-            }
-
-            let hasIncomingMessage = false;
-            
-
-            data.messages.forEach(function (message) {
-                addMessageToScreen(message);
-
-                if (Number(message.sender_id) !== currentUserId) {
-                    hasIncomingMessage = true;
-                    
-                }
-            });
-
-            if (hasIncomingMessage) {
-                markSeen();
-            }
-
-        } catch (error) {
-            console.log("Fetch messages error:", error);
+      try {
+        const response = await fetch(`/chat/${roomId}/messages/?after_id=${lastMessageId}`)
+        const data = await response.json()
+    
+        if (!data.success) {
+          return
         }
+    
+        let hasIncomingMessage = false
+    
+        data.messages.forEach(function (message) {
+          addMessageToScreen(message)
+    
+          if (Number(message.sender_id) !== currentUserId) {
+            hasIncomingMessage = true
+          }
+        })
+    
+        if (hasIncomingMessage) {
+          markSeen()
+        }
+      } catch (error) {
+        console.log('Fetch messages error:', error)
+      }
     }
-
+    
     async function markSeen() {
-        try {
-            await fetch(`/chat/${roomId}/mark-seen/`, {
-                method: "POST",
-                headers: {
-                    "X-CSRFToken": csrftoken
-                }
-            });
-        } catch (error) {
-            console.log("Mark seen error:", error);
-        }
+      try {
+        await fetch(`/chat/${roomId}/mark-seen/`, {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrftoken
+          }
+        })
+      } catch (error) {
+        console.log('Mark seen error:', error)
+      }
     }
-
+    
     async function sendHeartbeat() {
-        try {
-            await fetch("{% url 'heartbeat_api' %}", {
-                method: "POST",
-                headers: {
-                    "X-CSRFToken": csrftoken
-                }
-            });
-        } catch (error) {
-            console.log("Heartbeat error:", error);
-        }
+      try {
+        await fetch("{% url 'heartbeat_api' %}", {
+          method: 'POST',
+          headers: {
+            'X-CSRFToken': csrftoken
+          }
+        })
+      } catch (error) {
+        console.log('Heartbeat error:', error)
+      }
     }
-
+    
     async function fetchUserStatus() {
-        if (!onlineStatus) {
-            return;
+      if (!onlineStatus) {
+        return
+      }
+    
+      try {
+        const response = await fetch(`/presence/user/${otherUserId}/`)
+        const data = await response.json()
+    
+        if (!data.success) {
+          return
         }
-
-        try {
-            const response = await fetch(`/presence/user/${otherUserId}/`);
-            const data = await response.json();
-
-            if (!data.success) {
-                return;
-            }
-
-            if (data.is_online) {
-                onlineStatus.textContent = "Online";
-                onlineStatus.classList.add("online-text");
-                onlineStatus.classList.remove("offline-text");
-            } else {
-                onlineStatus.textContent = data.last_seen ? `Last seen ${data.last_seen}` : "Offline";
-                onlineStatus.classList.add("offline-text");
-                onlineStatus.classList.remove("online-text");
-            }
-        } catch (error) {
-            console.log("Status error:", error);
-        }
-    }
-
-    async function updateSidebarStatuses() {
-        const sidebarDots = document.querySelectorAll("[data-sidebar-status-user-id]");
-
-        for (const dot of sidebarDots) {
-            const userId = dot.dataset.sidebarStatusUserId;
-
-            try {
-                const response = await fetch(`/presence/user/${userId}/`);
-                const data = await response.json();
-
-                if (data.success) {
-                    if (data.is_online) {
-                        dot.classList.add("online");
-                        dot.classList.remove("offline");
-                    } else {
-                        dot.classList.add("offline");
-                        dot.classList.remove("online");
-                    }
-                }
-            } catch (error) {
-                console.log("Sidebar status error:", error);
-            }
-        }
-    }
-
-    function updateSoundButton() {
-        if (!soundToggleBtn) {
-            return;
-        }
-
-        if (notificationSoundEnabled) {
-            soundToggleBtn.textContent = "🔔";
-            soundToggleBtn.classList.remove("muted");
+    
+        if (data.is_online) {
+          onlineStatus.textContent = 'Online'
+          onlineStatus.classList.add('online-text')
+          onlineStatus.classList.remove('offline-text')
         } else {
-            soundToggleBtn.textContent = "🔕";
-            soundToggleBtn.classList.add("muted");
+          onlineStatus.textContent = data.last_seen ? `Last seen ${data.last_seen}` : 'Offline'
+          onlineStatus.classList.add('offline-text')
+          onlineStatus.classList.remove('online-text')
         }
+      } catch (error) {
+        console.log('Status error:', error)
+      }
     }
-
-    function playMessageSound() {
-        if (!notificationSoundEnabled) {
-            return;
-        }
-
+    
+    async function updateSidebarStatuses() {
+      const sidebarDots = document.querySelectorAll('[data-sidebar-status-user-id]')
+    
+      for (const dot of sidebarDots) {
+        const userId = dot.dataset.sidebarStatusUserId
+    
         try {
-            const AudioContext = window.AudioContext || window.webkitAudioContext;
-            const audioContext = new AudioContext();
-
-            const oscillator = audioContext.createOscillator();
-            const gainNode = audioContext.createGain();
-
-            oscillator.type = "sine";
-            oscillator.frequency.setValueAtTime(880, audioContext.currentTime);
-
-            gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime);
-            gainNode.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + 0.01);
-            gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.16);
-
-            oscillator.connect(gainNode);
-            gainNode.connect(audioContext.destination);
-
-            oscillator.start(audioContext.currentTime);
-            oscillator.stop(audioContext.currentTime + 0.18);
+          const response = await fetch(`/presence/user/${userId}/`)
+          const data = await response.json()
+    
+          if (data.success) {
+            if (data.is_online) {
+              dot.classList.add('online')
+              dot.classList.remove('offline')
+            } else {
+              dot.classList.add('offline')
+              dot.classList.remove('online')
+            }
+          }
         } catch (error) {
-            console.log("Sound error:", error);
+          console.log('Sidebar status error:', error)
         }
+      }
     }
-
+    
+    function updateSoundButton() {
+      if (!soundToggleBtn) {
+        return
+      }
+    
+      if (notificationSoundEnabled) {
+        soundToggleBtn.textContent = '🔔'
+        soundToggleBtn.classList.remove('muted')
+      } else {
+        soundToggleBtn.textContent = '🔕'
+        soundToggleBtn.classList.add('muted')
+      }
+    }
+    
+    function playMessageSound() {
+      if (!notificationSoundEnabled) {
+        return
+      }
+    
+      try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext
+        const audioContext = new AudioContext()
+    
+        const oscillator = audioContext.createOscillator()
+        const gainNode = audioContext.createGain()
+    
+        oscillator.type = 'sine'
+        oscillator.frequency.setValueAtTime(880, audioContext.currentTime)
+    
+        gainNode.gain.setValueAtTime(0.0001, audioContext.currentTime)
+        gainNode.gain.exponentialRampToValueAtTime(0.12, audioContext.currentTime + 0.01)
+        gainNode.gain.exponentialRampToValueAtTime(0.0001, audioContext.currentTime + 0.16)
+    
+        oscillator.connect(gainNode)
+        gainNode.connect(audioContext.destination)
+    
+        oscillator.start(audioContext.currentTime)
+        oscillator.stop(audioContext.currentTime + 0.18)
+      } catch (error) {
+        console.log('Sound error:', error)
+      }
+    }
+    
     function sendTypingStatus(isTyping) {
-        if (!socket || socket.readyState !== WebSocket.OPEN) {
-            return;
-        }
-
-        socket.send(JSON.stringify({
-            event_type: "typing",
-            is_typing: isTyping
-        }));
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        return
+      }
+    
+      socket.send(
+        JSON.stringify({
+          event_type: 'typing',
+          is_typing: isTyping
+        })
+      )
     }
-
+    
     function showTypingIndicator() {
-        if (!typingIndicator) {
-            return;
-        }
-
-        typingIndicator.style.display = "block";
-
-        clearTimeout(typingHideTimer);
-
-        typingHideTimer = setTimeout(function () {
-            typingIndicator.style.display = "none";
-        }, 1800);
+      if (!typingIndicator) {
+        return
+      }
+    
+      typingIndicator.style.display = 'block'
+    
+      clearTimeout(typingHideTimer)
+    
+      typingHideTimer = setTimeout(function () {
+        typingIndicator.style.display = 'none'
+      }, 1800)
     }
-
+    
     function hideTypingIndicator() {
-        if (!typingIndicator) {
-            return;
-        }
-
-        typingIndicator.style.display = "none";
-        clearTimeout(typingHideTimer);
+      if (!typingIndicator) {
+        return
+      }
+    
+      typingIndicator.style.display = 'none'
+      clearTimeout(typingHideTimer)
     }
-
+    
     function openMessageMenu(row) {
-        if (!row || !messageActionOverlay || !messageActionSheet) {
-            return;
+      if (!row || !messageActionOverlay || !messageActionSheet) {
+        return
+      }
+    
+      const actions = row.querySelector('.message-actions')
+    
+      if (!actions) {
+        return
+      }
+    
+      const bubble = row.querySelector('.bubble')
+    
+      if (!bubble) {
+        return
+      }
+    
+      selectedMessageRow = row
+    
+      const messageText = row.querySelector('.message-text')
+      const senderId = Number(row.dataset.senderId)
+      const isOwnMessage = senderId === currentUserId
+    
+      if (messageActionTitle) {
+        messageActionTitle.textContent = messageText ? truncateText(messageText.textContent.trim(), 35) : 'Message options'
+      }
+    
+      if (menuEditBtn && menuDeleteEveryoneBtn) {
+        if (isOwnMessage) {
+          menuEditBtn.style.display = 'flex'
+          menuDeleteEveryoneBtn.style.display = 'flex'
+        } else {
+          menuEditBtn.style.display = 'none'
+          menuDeleteEveryoneBtn.style.display = 'none'
         }
-
-        const actions = row.querySelector(".message-actions");
-
-        if (!actions) {
-            return;
+      }
+    
+      messageActionOverlay.classList.add('show')
+    
+      messageActionSheet.style.visibility = 'hidden'
+      messageActionSheet.style.left = '0px'
+      messageActionSheet.style.top = '0px'
+    
+      requestAnimationFrame(function () {
+        const bubbleRect = bubble.getBoundingClientRect()
+    
+        const sheetWidth = messageActionSheet.offsetWidth
+        const sheetHeight = messageActionSheet.offsetHeight
+    
+        let top = bubbleRect.top - sheetHeight - 8
+    
+        if (top < 74) {
+          top = bubbleRect.bottom + 8
         }
-
-        const bubble = row.querySelector(".bubble");
-
-        if (!bubble) {
-            return;
+    
+        if (top + sheetHeight > window.innerHeight - 12) {
+          top = window.innerHeight - sheetHeight - 12
         }
-
-        selectedMessageRow = row;
-
-        const messageText = row.querySelector(".message-text");
-        const senderId = Number(row.dataset.senderId);
-        const isOwnMessage = senderId === currentUserId;
-
-        if (messageActionTitle) {
-            messageActionTitle.textContent = messageText
-                ? truncateText(messageText.textContent.trim(), 35)
-                : "Message options";
+    
+        let left
+    
+        if (isOwnMessage) {
+          left = bubbleRect.right - sheetWidth
+          messageActionSheet.classList.add('menu-own')
+          messageActionSheet.classList.remove('menu-other')
+        } else {
+          left = bubbleRect.left
+          messageActionSheet.classList.add('menu-other')
+          messageActionSheet.classList.remove('menu-own')
         }
-
-        if (menuEditBtn && menuDeleteEveryoneBtn) {
-            if (isOwnMessage) {
-                menuEditBtn.style.display = "flex";
-                menuDeleteEveryoneBtn.style.display = "flex";
-            } else {
-                menuEditBtn.style.display = "none";
-                menuDeleteEveryoneBtn.style.display = "none";
-            }
+    
+        if (left < 10) {
+          left = 10
         }
-
-        messageActionOverlay.classList.add("show");
-
-        messageActionSheet.style.visibility = "hidden";
-        messageActionSheet.style.left = "0px";
-        messageActionSheet.style.top = "0px";
-
-        requestAnimationFrame(function () {
-            const bubbleRect = bubble.getBoundingClientRect();
-
-            const sheetWidth = messageActionSheet.offsetWidth;
-            const sheetHeight = messageActionSheet.offsetHeight;
-
-            let top = bubbleRect.top - sheetHeight - 8;
-
-            if (top < 74) {
-                top = bubbleRect.bottom + 8;
-            }
-
-            if (top + sheetHeight > window.innerHeight - 12) {
-                top = window.innerHeight - sheetHeight - 12;
-            }
-
-            let left;
-
-            if (isOwnMessage) {
-                left = bubbleRect.right - sheetWidth;
-                messageActionSheet.classList.add("menu-own");
-                messageActionSheet.classList.remove("menu-other");
-            } else {
-                left = bubbleRect.left;
-                messageActionSheet.classList.add("menu-other");
-                messageActionSheet.classList.remove("menu-own");
-            }
-
-            if (left < 10) {
-                left = 10;
-            }
-
-            if (left + sheetWidth > window.innerWidth - 10) {
-                left = window.innerWidth - sheetWidth - 10;
-            }
-
-            messageActionSheet.style.top = `${top}px`;
-            messageActionSheet.style.left = `${left}px`;
-            messageActionSheet.style.visibility = "visible";
-        });
+    
+        if (left + sheetWidth > window.innerWidth - 10) {
+          left = window.innerWidth - sheetWidth - 10
+        }
+    
+        messageActionSheet.style.top = `${top}px`
+        messageActionSheet.style.left = `${left}px`
+        messageActionSheet.style.visibility = 'visible'
+      })
     }
-
+    
     function closeMessageMenu() {
-        if (!messageActionOverlay || !messageActionSheet) {
-            return;
-        }
-
-        messageActionOverlay.classList.remove("show");
-
-        messageActionSheet.style.visibility = "hidden";
-        messageActionSheet.style.left = "0px";
-        messageActionSheet.style.top = "0px";
-
-        selectedMessageRow = null;
+      if (!messageActionOverlay || !messageActionSheet) {
+        return
+      }
+    
+      messageActionOverlay.classList.remove('show')
+    
+      messageActionSheet.style.visibility = 'hidden'
+      messageActionSheet.style.left = '0px'
+      messageActionSheet.style.top = '0px'
+    
+      selectedMessageRow = null
     }
-
+    
     async function handleMessageMenuAction(action) {
-        if (!selectedMessageRow) {
-            return;
+      if (!selectedMessageRow) {
+        return
+      }
+    
+      const row = selectedMessageRow
+      const messageId = row.dataset.messageId
+    
+      if (action === 'reply') {
+        const replyBtn = row.querySelector('.reply-btn')
+    
+        if (replyBtn) {
+          clearEditMode()
+    
+          replyToInput.value = replyBtn.dataset.messageId
+          replySender.textContent = replyBtn.dataset.sender
+          replyText.textContent = replyBtn.dataset.messageText
+          replyPreview.style.display = 'flex'
+    
+          closeMessageMenu()
+          focusMessageInput()
         }
-
-        const row = selectedMessageRow;
-        const messageId = row.dataset.messageId;
-
-        if (action === "reply") {
-            const replyBtn = row.querySelector(".reply-btn");
-
-            if (replyBtn) {
-                clearEditMode();
-
-                replyToInput.value = replyBtn.dataset.messageId;
-                replySender.textContent = replyBtn.dataset.sender;
-                replyText.textContent = replyBtn.dataset.messageText;
-                replyPreview.style.display = "flex";
-
-                closeMessageMenu();
-                focusMessageInput();
-            }
-
-            return;
+    
+        return
+      }
+    
+      if (action === 'edit') {
+        const editBtn = row.querySelector('.edit-btn')
+    
+        if (editBtn) {
+          clearReply()
+    
+          editingMessageId = editBtn.dataset.messageId
+          messageInput.value = editBtn.dataset.messageText
+          messageInput.placeholder = 'Edit your message...'
+          sendBtn.textContent = 'Update'
+    
+          closeMessageMenu()
+          focusMessageInput()
         }
-
-        if (action === "edit") {
-            const editBtn = row.querySelector(".edit-btn");
-
-            if (editBtn) {
-                clearReply();
-
-                editingMessageId = editBtn.dataset.messageId;
-                messageInput.value = editBtn.dataset.messageText;
-                messageInput.placeholder = "Edit your message...";
-                sendBtn.textContent = "Update";
-
-                closeMessageMenu();
-                focusMessageInput();
-            }
-
-            return;
+    
+        return
+      }
+    
+      if (action === 'delete-me') {
+        closeMessageMenu()
+    
+        const data = await deleteMessageByApi(messageId, 'me')
+    
+        if (data.success) {
+          row.remove()
+          showEmptyChatIfNeeded()
+        } else {
+          console.log('Delete for me failed:', data.error)
         }
-
-        if (action === "delete-me") {
-            closeMessageMenu();
-
-            const data = await deleteMessageByApi(messageId, "me");
-
-            if (data.success) {
-                row.remove();
-                showEmptyChatIfNeeded();
-            } else {
-                console.log("Delete for me failed:", data.error);
-            }
-
-            return;
+    
+        return
+      }
+    
+      if (action === 'delete-everyone') {
+        closeMessageMenu()
+    
+        const data = await deleteMessageByApi(messageId, 'everyone')
+    
+        if (data.success) {
+          markMessageDeletedForEveryone(data)
+        } else {
+          console.log('Delete for everyone failed:', data.error)
         }
-
-        if (action === "delete-everyone") {
-            closeMessageMenu();
-
-            const data = await deleteMessageByApi(messageId, "everyone");
-
-            if (data.success) {
-                markMessageDeletedForEveryone(data);
-            } else {
-                console.log("Delete for everyone failed:", data.error);
-            }
-
-            return;
-        }
-
-        if (action === "cancel") {
-            closeMessageMenu();
-        }
+    
+        return
+      }
+    
+      if (action === 'cancel') {
+        closeMessageMenu()
+      }
     }
-
+    
     function connectWebSocket() {
-        const protocol = window.location.protocol === "https:" ? "wss" : "ws";
-
-        socket = new WebSocket(`${protocol}://${window.location.host}/ws/chat/${roomId}/`);
-
-        socket.onopen = function () {
-            console.log("Chat socket connected");
-        };
-
-        socket.onmessage = function (event) {
-            const data = JSON.parse(event.data);
-
-            if (data.event_type === "new_message") {
-                addMessageToScreen(data);
-
-                if (Number(data.sender_id) !== currentUserId) {
-                    markSeen();
-                    
-                }
-            }
-
-            if (data.event_type === "message_updated") {
-                updateMessageOnScreen(data);
-            }
-
-            if (data.event_type === "message_deleted") {
-                if (data.delete_type === "everyone") {
-                    markMessageDeletedForEveryone(data);
-                }
-            }
-
-            if (data.event_type === "message_status_updated") {
-                updateMessageStatuses(data.message_ids || [], data.status_text);
-            }
-
-            if (data.event_type === "typing") {
-                if (Number(data.user_id) !== currentUserId) {
-                    if (data.is_typing) {
-                        showTypingIndicator();
-                    } else {
-                        hideTypingIndicator();
-                    }
-                }
-            }
-        };
-
-        socket.onerror = function () {
-            console.log("Chat socket error");
-        };
-
-        socket.onclose = function () {
-            console.log("Chat socket closed. Reconnecting...");
-            setTimeout(connectWebSocket, 2000);
-        };
-    }
-
-    if (chatMessages) {
-        chatMessages.addEventListener("selectstart", function (event) {
-            if (event.target.closest(".bubble")) {
-                event.preventDefault();
-                clearTextSelection();
-            }
-        });
-
-        chatMessages.addEventListener("dragstart", function (event) {
-            if (event.target.closest(".bubble")) {
-                event.preventDefault();
-            }
-        });
-
-        chatMessages.addEventListener("click", function (event) {
-            const bubble = event.target.closest(".bubble");
-
-            if (!bubble) {
-                return;
-            }
-
-            if (ignoreNextClick) {
-                ignoreNextClick = false;
-                return;
-            }
-
-            const row = bubble.closest(".bubble-row");
-
-            if (!row) {
-                return;
-            }
-
-            openMessageMenu(row);
-        });
-
-        chatMessages.addEventListener("contextmenu", function (event) {
-            const bubble = event.target.closest(".bubble");
-
-            if (!bubble) {
-                return;
-            }
-
-            event.preventDefault();
-
-            const row = bubble.closest(".bubble-row");
-
-            if (!row) {
-                return;
-            }
-
-            openMessageMenu(row);
-        });
-
-        chatMessages.addEventListener("touchstart", function (event) {
-            const bubble = event.target.closest(".bubble");
-
-            if (!bubble) {
-                return;
-            }
-
-            clearTextSelection();
-
-            const row = bubble.closest(".bubble-row");
-
-            if (!row) {
-                return;
-            }
-
-            clearTimeout(longPressTimer);
-
-            longPressTimer = setTimeout(function () {
-                clearTextSelection();
-                ignoreNextClick = true;
-                openMessageMenu(row);
-            }, 380);
-        }, { passive: true });
-
-        chatMessages.addEventListener("touchend", function () {
-            clearTimeout(longPressTimer);
-        });
-
-        chatMessages.addEventListener("touchmove", function () {
-            clearTimeout(longPressTimer);
-        });
-    }
-
-    if (messageActionOverlay) {
-        messageActionOverlay.addEventListener("click", async function (event) {
-            if (event.target === messageActionOverlay) {
-                closeMessageMenu();
-                return;
-            }
-
-            const actionButton = event.target.closest("[data-menu-action]");
-
-            if (!actionButton) {
-                return;
-            }
-
-            const action = actionButton.dataset.menuAction;
-
-            await handleMessageMenuAction(action);
-        });
-    }
-
-    if (cancelReplyBtn) {
-        cancelReplyBtn.addEventListener("click", function () {
-            clearReply();
-            focusMessageInput();
-        });
-    }
-
-    if (attachBtn && mediaInput) {
-        attachBtn.addEventListener("click", function () {
-            mediaInput.click();
-        });
-    }
-
-    if (mediaInput) {
-        mediaInput.addEventListener("change", function () {
-            const selectedFile = mediaInput.files[0];
-
-            if (!selectedFile) {
-                resetMediaInput();
-                return;
-            }
-
-            const maxSize = 10 * 1024 * 1024;
-
-            if (selectedFile.size > maxSize) {
-                resetMediaInput();
-                console.log("File too large. Max 10 MB allowed.");
-                return;
-            }
-
-            showMediaPreview(selectedFile);
-            focusMessageInput();
-        });
-    }
-
-    if (cancelMediaBtn) {
-        cancelMediaBtn.addEventListener("click", function () {
-            resetMediaInput();
-            focusMessageInput();
-        });
-    }
-
-    if (soundToggleBtn) {
-        soundToggleBtn.addEventListener("click", function () {
-            notificationSoundEnabled = !notificationSoundEnabled;
-            localStorage.setItem("chat_sound_enabled", notificationSoundEnabled ? "true" : "false");
-            updateSoundButton();
-        });
-    }
-
-    if (messageInput) {
-        messageInput.addEventListener("input", function () {
-            if (editingMessageId) {
-                return;
-            }
-
-            const now = Date.now();
-
-            if (now - lastTypingSentAt > 600) {
-                sendTypingStatus(true);
-                lastTypingSentAt = now;
-            }
-
-            clearTimeout(typingTimer);
-
-            typingTimer = setTimeout(function () {
-                sendTypingStatus(false);
-            }, 900);
-        });
-    }
-
-    if (sendBtn && chatForm) {
-        sendBtn.addEventListener("touchstart", function (event) {
-            event.preventDefault();
-
-            if (chatForm.requestSubmit) {
-                chatForm.requestSubmit();
+      const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
+    
+      socket = new WebSocket(`${protocol}://${window.location.host}/ws/chat/${roomId}/`)
+    
+      socket.onopen = function () {
+        console.log('Chat socket connected')
+      }
+    
+      socket.onmessage = function (event) {
+        const data = JSON.parse(event.data)
+    
+        if (data.event_type === 'new_message') {
+          addMessageToScreen(data)
+    
+          if (Number(data.sender_id) !== currentUserId) {
+            markSeen()
+          }
+        }
+    
+        if (data.event_type === 'message_updated') {
+          updateMessageOnScreen(data)
+        }
+    
+        if (data.event_type === 'message_deleted') {
+          if (data.delete_type === 'everyone') {
+            markMessageDeletedForEveryone(data)
+          }
+        }
+    
+        if (data.event_type === 'message_status_updated') {
+          updateMessageStatuses(data.message_ids || [], data.status_text)
+        }
+    
+        if (data.event_type === 'typing') {
+          if (Number(data.user_id) !== currentUserId) {
+            if (data.is_typing) {
+              showTypingIndicator()
             } else {
-                chatForm.dispatchEvent(new Event("submit", { cancelable: true }));
+              hideTypingIndicator()
             }
-        }, { passive: false });
-
-        sendBtn.addEventListener("mousedown", function (event) {
-            event.preventDefault();
-        });
+          }
+        }
+      }
+    
+      socket.onerror = function () {
+        console.log('Chat socket error')
+      }
+    
+      socket.onclose = function () {
+        console.log('Chat socket closed. Reconnecting...')
+        setTimeout(connectWebSocket, 2000)
+      }
     }
-
+    
+    if (chatMessages) {
+      chatMessages.addEventListener('selectstart', function (event) {
+        if (event.target.closest('.bubble')) {
+          event.preventDefault()
+          clearTextSelection()
+        }
+      })
+    
+      chatMessages.addEventListener('dragstart', function (event) {
+        if (event.target.closest('.bubble')) {
+          event.preventDefault()
+        }
+      })
+    
+      chatMessages.addEventListener('click', function (event) {
+        const bubble = event.target.closest('.bubble')
+    
+        if (!bubble) {
+          return
+        }
+    
+        if (ignoreNextClick) {
+          ignoreNextClick = false
+          return
+        }
+    
+        const row = bubble.closest('.bubble-row')
+    
+        if (!row) {
+          return
+        }
+    
+        openMessageMenu(row)
+      })
+    
+      chatMessages.addEventListener('contextmenu', function (event) {
+        const bubble = event.target.closest('.bubble')
+    
+        if (!bubble) {
+          return
+        }
+    
+        event.preventDefault()
+    
+        const row = bubble.closest('.bubble-row')
+    
+        if (!row) {
+          return
+        }
+    
+        openMessageMenu(row)
+      })
+    
+      chatMessages.addEventListener(
+        'touchstart',
+        function (event) {
+          const bubble = event.target.closest('.bubble')
+    
+          if (!bubble) {
+            return
+          }
+    
+          clearTextSelection()
+    
+          const row = bubble.closest('.bubble-row')
+    
+          if (!row) {
+            return
+          }
+    
+          clearTimeout(longPressTimer)
+    
+          longPressTimer = setTimeout(function () {
+            clearTextSelection()
+            ignoreNextClick = true
+            openMessageMenu(row)
+          }, 380)
+        },
+        { passive: true }
+      )
+    
+      chatMessages.addEventListener('touchend', function () {
+        clearTimeout(longPressTimer)
+      })
+    
+      chatMessages.addEventListener('touchmove', function () {
+        clearTimeout(longPressTimer)
+      })
+    }
+    
+    if (messageActionOverlay) {
+      messageActionOverlay.addEventListener('click', async function (event) {
+        if (event.target === messageActionOverlay) {
+          closeMessageMenu()
+          return
+        }
+    
+        const actionButton = event.target.closest('[data-menu-action]')
+    
+        if (!actionButton) {
+          return
+        }
+    
+        const action = actionButton.dataset.menuAction
+    
+        await handleMessageMenuAction(action)
+      })
+    }
+    
+    if (cancelReplyBtn) {
+      cancelReplyBtn.addEventListener('click', function () {
+        clearReply()
+        focusMessageInput()
+      })
+    }
+    
+    if (voiceBtn) {
+      voiceBtn.addEventListener('click', async function () {
+        if (isRecordingVoice) {
+          stopVoiceRecording()
+        } else {
+          await startVoiceRecording()
+        }
+      })
+    }
+    
+    if (cancelVoiceBtn) {
+      cancelVoiceBtn.addEventListener('click', function () {
+        if (isRecordingVoice) {
+          stopVoiceRecording()
+        }
+    
+        resetVoiceNote()
+        focusMessageInput()
+      })
+    }
+    
+    if (soundToggleBtn) {
+      soundToggleBtn.addEventListener('click', function () {
+        notificationSoundEnabled = !notificationSoundEnabled
+        localStorage.setItem('chat_sound_enabled', notificationSoundEnabled ? 'true' : 'false')
+        updateSoundButton()
+      })
+    }
+    
+    if (messageInput) {
+      messageInput.addEventListener('input', function () {
+        if (editingMessageId) {
+          return
+        }
+    
+        const now = Date.now()
+    
+        if (now - lastTypingSentAt > 600) {
+          sendTypingStatus(true)
+          lastTypingSentAt = now
+        }
+    
+        clearTimeout(typingTimer)
+    
+        typingTimer = setTimeout(function () {
+          sendTypingStatus(false)
+        }, 900)
+      })
+    }
+    
+    if (sendBtn && chatForm) {
+      sendBtn.addEventListener(
+        'touchstart',
+        function (event) {
+          event.preventDefault()
+    
+          if (chatForm.requestSubmit) {
+            chatForm.requestSubmit()
+          } else {
+            chatForm.dispatchEvent(new Event('submit', { cancelable: true }))
+          }
+        },
+        { passive: false }
+      )
+    
+      sendBtn.addEventListener('mousedown', function (event) {
+        event.preventDefault()
+      })
+    }
+    
     if (chatForm) {
-        chatForm.addEventListener("submit", async function (event) {
-            event.preventDefault();
-
-            if (isSendingMessage) {
-                return;
+      chatForm.addEventListener('submit', async function (event) {
+        event.preventDefault()
+    
+        if (isSendingMessage) {
+          return
+        }
+    
+        const messageTextValue = messageInput.value.trim()
+        const replyToIdValue = replyToInput ? replyToInput.value : ''
+        const selectedVoiceBlob = recordedVoiceBlob
+        const selectedVoiceDuration = recordedVoiceDuration
+    
+        if (messageTextValue === '' && !selectedVoiceBlob) {
+          focusMessageInput()
+          return
+        }
+    
+        isSendingMessage = true
+    
+        sendTypingStatus(false)
+    
+        if (editingMessageId) {
+          const editingId = editingMessageId
+    
+          messageInput.value = ''
+          sendBtn.textContent = 'Updating...'
+    
+          try {
+            const data = await editMessageByApi(editingId, messageTextValue)
+    
+            if (data.success && data.message) {
+              updateMessageOnScreen(data.message)
+              afterMessageAction()
+            } else {
+              messageInput.value = messageTextValue
+              sendBtn.textContent = 'Update'
+              editingMessageId = editingId
+              console.log('Edit failed:', data.error)
             }
-
-            const messageTextValue = messageInput.value.trim();
-            const replyToIdValue = replyToInput ? replyToInput.value : "";
-            const selectedMediaFile = mediaInput ? mediaInput.files[0] : null;
-
-            if (messageTextValue === "" && !selectedMediaFile) {
-                focusMessageInput();
-                return;
-            }
-
-            isSendingMessage = true;
-
-            sendTypingStatus(false);
-
-            if (editingMessageId) {
-                const editingId = editingMessageId;
-
-                messageInput.value = "";
-                sendBtn.textContent = "Updating...";
-
-                try {
-                    const data = await editMessageByApi(editingId, messageTextValue);
-
-                    if (data.success && data.message) {
-                        updateMessageOnScreen(data.message);
-                        afterMessageAction();
-                    } else {
-                        messageInput.value = messageTextValue;
-                        sendBtn.textContent = "Update";
-                        editingMessageId = editingId;
-                        console.log("Edit failed:", data.error);
-                    }
-                } catch (error) {
-                    messageInput.value = messageTextValue;
-                    sendBtn.textContent = "Update";
-                    editingMessageId = editingId;
-                    console.log("Edit error:", error);
-                }
-
-                isSendingMessage = false;
-                focusMessageInput();
-                return;
-            }
-
-            const tempId = `temp-${Date.now()}`;
-
-            messageInput.value = "";
-            sendBtn.textContent = "Send";
-
-            addTempMessageToScreen(tempId, messageTextValue, selectedMediaFile);
-
-            clearReply();
-            resetMediaInput();
-            focusMessageInput();
-
-            try {
-                const data = await sendMessageByApi(messageTextValue, replyToIdValue, selectedMediaFile);
-
-                if (data.success && data.message) {
-                    removeTempMessage(tempId);
-                    addMessageToScreen(data.message);
-                } else {
-                    markTempMessageFailed(tempId);
-                    console.log("Send failed:", data.error);
-                }
-            } catch (error) {
-                markTempMessageFailed(tempId);
-                console.log("Send error:", error);
-            }
-
-            isSendingMessage = false;
-            focusMessageInput();
-        });
+          } catch (error) {
+            messageInput.value = messageTextValue
+            sendBtn.textContent = 'Update'
+            editingMessageId = editingId
+            console.log('Edit error:', error)
+          }
+    
+          isSendingMessage = false
+          focusMessageInput()
+          return
+        }
+    
+        const tempId = `temp-${Date.now()}`
+    
+        messageInput.value = ''
+        sendBtn.textContent = 'Send'
+    
+        addTempMessageToScreen(tempId, messageTextValue, selectedVoiceBlob, selectedVoiceDuration)
+    
+        clearReply()
+        resetVoiceNote()
+        focusMessageInput()
+    
+        try {
+          const data = await sendMessageByApi(messageTextValue, replyToIdValue, selectedVoiceBlob, selectedVoiceDuration)
+    
+          if (data.success && data.message) {
+            removeTempMessage(tempId)
+            addMessageToScreen(data.message)
+          } else {
+            markTempMessageFailed(tempId)
+            console.log('Send failed:', data.error)
+          }
+        } catch (error) {
+          markTempMessageFailed(tempId)
+          console.log('Send error:', error)
+        }
+    
+        isSendingMessage = false
+        focusMessageInput()
+      })
     }
-
-    window.addEventListener("resize", setMobileAppHeight);
-    window.addEventListener("orientationchange", setMobileAppHeight);
-
+    
+    window.addEventListener('resize', setMobileAppHeight)
+    window.addEventListener('orientationchange', setMobileAppHeight)
+    
     if (window.visualViewport) {
-        window.visualViewport.addEventListener("resize", setMobileAppHeight);
+      window.visualViewport.addEventListener('resize', setMobileAppHeight)
     }
-
-    connectWebSocket();
-    instantScrollToBottom();
-
-    sendHeartbeat();
-    fetchUserStatus();
-    updateSidebarStatuses();
-    markSeen();
-    updateSoundButton();
-
-    setInterval(fetchNewMessages, 1200);
-    setInterval(sendHeartbeat, 10000);
-    setInterval(fetchUserStatus, 3000);
-    setInterval(updateSidebarStatuses, 3000);
-</script>
-
-
-
-
+    
+    connectWebSocket()
+    instantScrollToBottom()
+    initializeVoicePlayers();
+    
+    sendHeartbeat()
+    fetchUserStatus()
+    updateSidebarStatuses()
+    markSeen()
+    updateSoundButton()
+    
+    setInterval(fetchNewMessages, 1200)
+    setInterval(sendHeartbeat, 10000)
+    setInterval(fetchUserStatus, 3000)
+    setInterval(updateSidebarStatuses, 3000)
+  </script>
 
   {% comment %} <script>
     const roomId = "{{ room.id }}";
@@ -3027,5 +3282,6 @@ if (soundToggleBtn) {
     setInterval(sendHeartbeat, 10000);
     setInterval(fetchUserStatus, 3000);
     setInterval(updateSidebarStatuses, 3000);
-</script> {% endcomment %}
+</script>
+  {% endcomment %}
 {% endblock %}
