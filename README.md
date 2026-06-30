@@ -134,17 +134,10 @@ python manage.py runserver
 ## Future Improvements
 
 * Group chat
-* File sharing
 * Message delete option
 * Typing indicator
 * Profile picture upload
 * Email verification
 * Deployment with production database and Redis
 
-## Author
 
-**Shwet Srivastava**
-
-## Resume Summary
-
-Developed a real-time private chat application using Django, SQL Server, Django Channels, and WebSocket. Implemented user authentication, user search, private chat rooms, instant messaging, message history, unread message tracking, and online/offline user status.
