@@ -29,5 +29,9 @@ urlpatterns = [
     path("presence/heartbeat/", views.heartbeat_api, name="heartbeat_api"),
     path("presence/user/<int:user_id>/", views.user_status_api, name="user_status_api"),
 
+    path("settings/", views.account_settings_view, name="account_settings"),
+    path("chat/<int:room_id>/clear/", views.clear_chat_api, name="clear_chat_api"),
+    path("voice/<int:message_id>/", views.voice_message_view, name="voice_message"),
+
     path("app-admin/dashboard/", views.admin_dashboard_view, name="admin_dashboard"),
 ]

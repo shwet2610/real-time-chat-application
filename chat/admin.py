@@ -262,13 +262,19 @@ class MessageInline(admin.TabularInline):
         return False
 
     def voice_preview(self, obj):
-        if not obj.voice_note or not obj.voice_note.name:
-            return "-"
+        if obj.voice_data:
+            return format_html(
+            '<audio controls style="width:180px;"><source src="/voice/{}/"></audio>',
+            obj.id
+        )
 
-        return format_html(
-        '<audio controls style="width:180px;"><source src="{}"></audio>',
-        obj.voice_note.url
-    )
+        if obj.voice_note and obj.voice_note.name:
+            return format_html(
+            '<audio controls style="width:180px;"><source src="{}"></audio>',
+            obj.voice_note.url
+        )
+
+        return "-"
 
     voice_preview.short_description = "Voice Note"
 

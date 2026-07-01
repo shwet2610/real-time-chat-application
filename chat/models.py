@@ -70,6 +70,11 @@ class Message(models.Model):
     message = models.TextField(blank=True)
     
     voice_note = models.FileField(upload_to="voice_notes/", blank=True, null=True)
+
+    voice_data = models.BinaryField(blank=True, null=True)
+    voice_mime_type = models.CharField(max_length=80, blank=True)
+    voice_file_name = models.CharField(max_length=180, blank=True)
+
     voice_duration = models.PositiveIntegerField(default=0)
 
     is_read = models.BooleanField(default=False)

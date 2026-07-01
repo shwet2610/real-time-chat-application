@@ -1,0 +1,97 @@
+{% extends 'chat/base.html' %}
+
+{% block content %}
+<div class="settings-page-container">
+
+    <div class="settings-header-card">
+        <div>
+            <h1>Account Settings</h1>
+            <p>Manage your profile, account details and password.</p>
+        </div>
+
+        <a href="{% url 'profile_view' request.user.id %}" class="main-btn settings-profile-btn">
+            View Profile
+        </a>
+    </div>
+
+    <div class="settings-grid">
+
+        <div class="settings-card">
+            <h2>Profile Details</h2>
+            <p class="settings-subtitle">Update username, email, bio and profile photo.</p>
+
+            <form method="POST" enctype="multipart/form-data" class="settings-form">
+                {% csrf_token %}
+
+                <input type="hidden" name="form_type" value="profile">
+
+                <label>Username</label>
+                <input 
+                    type="text" 
+                    name="username" 
+                    value="{{ request.user.username }}" 
+                    required
+                >
+
+                <label>Email</label>
+                <input 
+                    type="email" 
+                    name="email" 
+                    value="{{ request.user.email }}"
+                    placeholder="Enter your email"
+                >
+
+                <label>Full Name</label>
+                <input 
+                    type="text" 
+                    name="full_name" 
+                    value="{{ profile.full_name }}"
+                    placeholder="Enter your full name"
+                >
+
+                <label>Bio</label>
+                <textarea 
+                    name="bio" 
+                    maxlength="180"
+                    placeholder="Write something about yourself..."
+                >{{ profile.bio }}</textarea>
+
+                <label>Profile Picture</label>
+                <input type="file" name="profile_picture" accept="image/*">
+
+                <button type="submit" class="main-btn">Save Changes</button>
+            </form>
+        </div>
+
+        <div class="settings-card">
+            <h2>Change Password</h2>
+            <p class="settings-subtitle">Use a strong password for better security.</p>
+
+            <form method="POST" class="settings-form">
+                {% csrf_token %}
+
+                <input type="hidden" name="form_type" value="password">
+
+                <label>Old Password</label>
+                {{ password_form.old_password }}
+
+                <label>New Password</label>
+                {{ password_form.new_password1 }}
+
+                <label>Confirm New Password</label>
+                {{ password_form.new_password2 }}
+
+                {% if password_form.errors %}
+                    <div class="settings-errors">
+                        {{ password_form.errors }}
+                    </div>
+                {% endif %}
+
+                <button type="submit" class="main-btn">Update Password</button>
+            </form>
+        </div>
+
+    </div>
+
+</div>
+{% endblock %}

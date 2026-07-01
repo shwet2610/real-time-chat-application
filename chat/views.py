@@ -13,6 +13,9 @@ from channels.layers import get_channel_layer
 from django.contrib.admin.views.decorators import staff_member_required
 from django.db.models import Count
 import os
+from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth import update_session_auth_hash
+from django.http import HttpResponse
 
 from .models import ChatRoom, Message, Profile
 
@@ -108,7 +111,7 @@ def get_last_message_preview(message, current_user):
     if message.message:
         return message.message
 
-    if message.voice_note:
+    if message.voice_data or message.voice_note:
         return "🎙️ Voice message"
 
     return "No messages yet"
@@ -192,11 +195,10 @@ def serialize_message(message, current_user=None):
         "seen_at": timezone.localtime(message.seen_at).strftime("%I:%M %p") if message.seen_at else "",
         "status_text": status_text,
 
-        "has_voice": bool(get_safe_file_url(message.voice_note)),
-    "voice_url": get_safe_file_url(message.voice_note),
-    "voice_duration": message.voice_duration,
-    "voice_duration_text": format_voice_duration(message.voice_duration),
-
+        "has_voice": bool(message.voice_data) or bool(get_safe_file_url(message.voice_note)),
+        "voice_url": f"/voice/{message.id}/" if message.voice_data else get_safe_file_url(message.voice_note),
+        "voice_duration": message.voice_duration,
+        "voice_duration_text": format_voice_duration(message.voice_duration),
 
         "reply_to": reply_data,
     }
@@ -478,7 +480,9 @@ def send_message_api(request, room_id):
         )
 
         if voice_note:
-            message.voice_note = voice_note
+            message.voice_data = voice_note.read()
+            message.voice_mime_type = voice_note.content_type or "audio/webm"
+            message.voice_file_name = voice_note.name
             message.voice_duration = voice_duration
             message.save()
 
@@ -563,65 +567,134 @@ def chat_messages_api(request, room_id):
     except ChatRoom.DoesNotExist:
         return JsonResponse({"success": False, "error": "Room not found"}, status=404)
 
-
 @login_required
 @require_POST
 def edit_message_api(request, room_id, message_id):
-    try:
-        room = ChatRoom.objects.get(id=room_id)
+    room = get_object_or_404(ChatRoom, id=room_id)
 
-        if request.user.id not in [room.user1_id, room.user2_id]:
-            return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
+    if request.user.id not in [room.user1_id, room.user2_id]:
+        return JsonResponse({
+            "success": False,
+            "error": "Not allowed"
+        }, status=403)
 
-        message = Message.objects.select_related(
-            "sender",
-            "receiver",
-            "room",
-            "reply_to",
-            "reply_to__sender"
-        ).get(id=message_id, room=room)
+    message = get_object_or_404(Message, id=message_id, room=room)
 
-        if message.sender_id != request.user.id:
-            return JsonResponse({"success": False, "error": "You can edit only your own message"}, status=403)
+    if message.sender != request.user:
+        return JsonResponse({
+            "success": False,
+            "error": "You can edit only your own message."
+        }, status=403)
 
-        new_text = request.POST.get("message", "").strip()
+    if message.voice_note:
+        return JsonResponse({
+            "success": False,
+            "error": "Voice messages cannot be edited."
+        }, status=400)
 
-        if new_text == "":
-            return JsonResponse({"success": False, "error": "Empty message"}, status=400)
+    if message.deleted_for_everyone:
+        return JsonResponse({
+            "success": False,
+            "error": "Deleted message cannot be edited."
+        }, status=400)
+
+    new_message_text = request.POST.get("message", "").strip()
+
+    if not new_message_text:
+        return JsonResponse({
+            "success": False,
+            "error": "Message cannot be empty."
+        }, status=400)
+
+    message.message = new_message_text
+    message.is_edited = True
+    message.edited_at = timezone.now()
+    message.save()
+
+    message = Message.objects.select_related(
+        "sender",
+        "receiver",
+        "room",
+        "reply_to",
+        "reply_to__sender"
+    ).get(id=message.id)
+
+    data = serialize_message(message, request.user)
+    data["event_type"] = "message_updated"
+
+    channel_layer = get_channel_layer()
+
+    if channel_layer is not None:
+        async_to_sync(channel_layer.group_send)(
+            f"chat_{room.id}",
+            {
+                "type": "message_updated",
+                "data": data,
+            }
+        )
+
+    return JsonResponse({
+        "success": True,
+        "message": data
+    })
+# @login_required
+# @require_POST
+# def edit_message_api(request, room_id, message_id):
+#     try:
+#         room = ChatRoom.objects.get(id=room_id)
+
+#         if request.user.id not in [room.user1_id, room.user2_id]:
+#             return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
+
+#         message = Message.objects.select_related(
+#             "sender",
+#             "receiver",
+#             "room",
+#             "reply_to",
+#             "reply_to__sender"
+#         ).get(id=message_id, room=room)
+
+#         if message.sender_id != request.user.id:
+#             return JsonResponse({"success": False, "error": "You can edit only your own message"}, status=403)
+
+#         new_text = request.POST.get("message", "").strip()
+
+#         if new_text == "":
+#             return JsonResponse({"success": False, "error": "Empty message"}, status=400)
         
-        if message.deleted_for_everyone:
-            return JsonResponse({
-                "success": False,
-                "error": "Deleted message cannot be edited."
-            }, status=400)
+#         if message.deleted_for_everyone:
+#             return JsonResponse({
+#                 "success": False,
+#                 "error": "Deleted message cannot be edited."
+#             }, status=400)
 
-        message.message = new_text
-        message.is_edited = True
-        message.edited_at = timezone.now()
-        message.save()
+#         message.message = new_text
+#         message.is_edited = True
+#         message.edited_at = timezone.now()
+#         message.save()
 
-        data = serialize_message(message)
-        data = serialize_message(message, request.user)
-        data["event_type"] = "message_updated"
+#         data = serialize_message(message)
+#         data = serialize_message(message, request.user)
+#         data["event_type"] = "message_updated"
 
-        channel_layer = get_channel_layer()
+#         channel_layer = get_channel_layer()
 
-        if channel_layer is not None:
-            async_to_sync(channel_layer.group_send)(
-                f"chat_{room.id}",
-                {
-                    "type": "message_updated",
-                    "data": data,
-                }
-            )
+#         if channel_layer is not None:
+#             async_to_sync(channel_layer.group_send)(
+#                 f"chat_{room.id}",
+#                 {
+#                     "type": "message_updated",
+#                     "data": data,
+#                 }
+#             )
 
-        return JsonResponse({"success": True, "message": data})
+#         return JsonResponse({"success": True, "message": data})
 
-    except ChatRoom.DoesNotExist:
-        return JsonResponse({"success": False, "error": "Room not found"}, status=404)
+#     except ChatRoom.DoesNotExist:
+#         return JsonResponse({"success": False, "error": "Room not found"}, status=404)
 
-    except Message.DoesNotExist:
-        return JsonResponse({"success": False, "error": "Message not found"}, status=404)
+#     except Message.DoesNotExist:
+#         return JsonResponse({"success": False, "error": "Message not found"}, status=404)
 
 
 @login_required
@@ -943,26 +1016,126 @@ def mark_seen_api(request, room_id):
         "status_text": "Seen",
     })
 
+# @staff_member_required
+# def admin_dashboard_view(request):
+#     now_time = timezone.now()
+#     online_limit = now_time - timedelta(seconds=90)
+
+#     total_users = User.objects.count()
+#     total_profiles = Profile.objects.count()
+#     total_chats = ChatRoom.objects.count()
+#     total_messages = Message.objects.count()
+
+#     voice_messages_query = Message.objects.filter(
+#         voice_note__isnull=False
+#     ).exclude(
+#         voice_note=""
+#     )
+
+#     total_voice_messages = voice_messages_query.count()
+#     active_users = Profile.objects.filter(last_seen__gte=online_limit).count()
+
+#     profiles = Profile.objects.select_related("user").order_by("-created_at")[:12]
+
+#     recent_voice_messages = voice_messages_query.select_related(
+#         "sender",
+#         "receiver",
+#         "room"
+#     ).order_by("-created_at")[:10]
+
+#     recent_chats = ChatRoom.objects.select_related(
+#         "user1",
+#         "user2"
+#     ).annotate(
+#         message_count=Count("messages")
+#     ).order_by("-updated_at")[:10]
+
+#     recent_messages = Message.objects.select_related(
+#         "sender",
+#         "receiver",
+#         "room"
+#     ).order_by("-created_at")[:12]
+
+#     return render(request, "chat/admin_dashboard.html", {
+#         "total_users": total_users,
+#         "total_profiles": total_profiles,
+#         "total_chats": total_chats,
+#         "total_messages": total_messages,
+#         "total_voice_messages": total_voice_messages,
+#         "active_users": active_users,
+#         "profiles": profiles,
+#         "recent_voice_messages": recent_voice_messages,
+#         "recent_chats": recent_chats,
+#         "recent_messages": recent_messages,
+#     })
+
+
 @staff_member_required
 def admin_dashboard_view(request):
     now_time = timezone.now()
+    today_start = timezone.localtime(now_time).replace(
+        hour=0,
+        minute=0,
+        second=0,
+        microsecond=0
+    )
+
     online_limit = now_time - timedelta(seconds=90)
 
+    voice_messages_query = Message.objects.filter(
+    voice_data__isnull=False
+    )
+
     total_users = User.objects.count()
+    total_staff_users = User.objects.filter(is_staff=True).count()
     total_profiles = Profile.objects.count()
     total_chats = ChatRoom.objects.count()
     total_messages = Message.objects.count()
-
-    voice_messages_query = Message.objects.filter(
-        voice_note__isnull=False
-    ).exclude(
-        voice_note=""
-    )
-
     total_voice_messages = voice_messages_query.count()
-    active_users = Profile.objects.filter(last_seen__gte=online_limit).count()
 
-    profiles = Profile.objects.select_related("user").order_by("-created_at")[:12]
+    active_users = Profile.objects.filter(
+        last_seen__gte=online_limit
+    ).count()
+
+    today_new_users = User.objects.filter(
+        date_joined__gte=today_start
+    ).count()
+
+    today_messages = Message.objects.filter(
+        created_at__gte=today_start
+    ).count()
+
+    today_voice_messages = voice_messages_query.filter(
+        created_at__gte=today_start
+    ).count()
+
+    edited_messages = Message.objects.filter(
+        is_edited=True
+    ).count()
+
+    deleted_for_everyone_messages = Message.objects.filter(
+        deleted_for_everyone=True
+    ).count()
+
+    profiles_with_photo = Profile.objects.filter(
+        profile_picture__isnull=False
+    ).exclude(
+        profile_picture=""
+    ).count()
+
+    profiles_with_bio = Profile.objects.exclude(
+        bio=""
+    ).count()
+
+    profiles = Profile.objects.select_related(
+        "user"
+    ).order_by("-created_at")[:12]
+
+    online_profiles = Profile.objects.filter(
+        last_seen__gte=online_limit
+    ).select_related(
+        "user"
+    ).order_by("-last_seen")[:10]
 
     recent_voice_messages = voice_messages_query.select_related(
         "sender",
@@ -977,6 +1150,18 @@ def admin_dashboard_view(request):
         message_count=Count("messages")
     ).order_by("-updated_at")[:10]
 
+    top_chat_rooms = ChatRoom.objects.select_related(
+        "user1",
+        "user2"
+    ).annotate(
+        message_count=Count("messages")
+    ).order_by("-message_count")[:8]
+
+    top_active_users = User.objects.annotate(
+        sent_count=Count("sent_messages"),
+        received_count=Count("received_messages")
+    ).order_by("-sent_count")[:8]
+
     recent_messages = Message.objects.select_related(
         "sender",
         "receiver",
@@ -985,13 +1170,145 @@ def admin_dashboard_view(request):
 
     return render(request, "chat/admin_dashboard.html", {
         "total_users": total_users,
+        "total_staff_users": total_staff_users,
         "total_profiles": total_profiles,
         "total_chats": total_chats,
         "total_messages": total_messages,
         "total_voice_messages": total_voice_messages,
         "active_users": active_users,
+        "today_new_users": today_new_users,
+        "today_messages": today_messages,
+        "today_voice_messages": today_voice_messages,
+        "edited_messages": edited_messages,
+        "deleted_for_everyone_messages": deleted_for_everyone_messages,
+        "profiles_with_photo": profiles_with_photo,
+        "profiles_with_bio": profiles_with_bio,
         "profiles": profiles,
+        "online_profiles": online_profiles,
         "recent_voice_messages": recent_voice_messages,
         "recent_chats": recent_chats,
+        "top_chat_rooms": top_chat_rooms,
+        "top_active_users": top_active_users,
         "recent_messages": recent_messages,
     })
+
+@login_required
+@require_POST
+def clear_chat_api(request, room_id):
+    room = get_object_or_404(ChatRoom, id=room_id)
+
+    if request.user.id not in [room.user1_id, room.user2_id]:
+        return JsonResponse({
+            "success": False,
+            "error": "Not allowed"
+        }, status=403)
+
+    messages_to_clear = Message.objects.filter(
+        room=room
+    ).exclude(
+        deleted_for=request.user
+    )
+
+    cleared_count = messages_to_clear.count()
+
+    for msg in messages_to_clear.iterator():
+        msg.deleted_for.add(request.user)
+
+    return JsonResponse({
+        "success": True,
+        "cleared_count": cleared_count
+    })
+
+@login_required
+def account_settings_view(request):
+    profile, created = Profile.objects.get_or_create(user=request.user)
+    password_form = PasswordChangeForm(request.user)
+
+    if request.method == "POST":
+        form_type = request.POST.get("form_type", "").strip()
+
+        if form_type == "profile":
+            username = request.POST.get("username", "").strip()
+            email = request.POST.get("email", "").strip()
+            full_name = request.POST.get("full_name", "").strip()
+            bio = request.POST.get("bio", "").strip()
+            profile_picture = request.FILES.get("profile_picture")
+
+            if not username:
+                messages.error(request, "Username is required.")
+                return redirect("account_settings")
+
+            username_exists = User.objects.filter(
+                username=username
+            ).exclude(
+                id=request.user.id
+            ).exists()
+
+            if username_exists:
+                messages.error(request, "This username is already taken.")
+                return redirect("account_settings")
+
+            request.user.username = username
+            request.user.email = email
+            request.user.save()
+
+            profile.full_name = full_name
+            profile.bio = bio
+
+            if profile_picture:
+                profile.profile_picture = profile_picture
+
+            profile.save()
+
+            messages.success(request, "Account details updated successfully.")
+            return redirect("account_settings")
+
+        if form_type == "password":
+            password_form = PasswordChangeForm(request.user, request.POST)
+
+            if password_form.is_valid():
+                user = password_form.save()
+                update_session_auth_hash(request, user)
+
+                messages.success(request, "Password changed successfully.")
+                return redirect("account_settings")
+
+            messages.error(request, "Please fix the password errors below.")
+
+    return render(request, "chat/account_settings.html", {
+        "profile": profile,
+        "password_form": password_form,
+    })
+
+@login_required
+def voice_message_view(request, message_id):
+    message = get_object_or_404(Message, id=message_id)
+
+    if request.user.id not in [message.sender_id, message.receiver_id]:
+        return HttpResponse("Not allowed", status=403)
+
+    if message.deleted_for_everyone:
+        return HttpResponse("Voice message deleted", status=404)
+
+    if request.user in message.deleted_for.all():
+        return HttpResponse("Voice message deleted for you", status=404)
+
+    if message.voice_data:
+        response = HttpResponse(
+            bytes(message.voice_data),
+            content_type=message.voice_mime_type or "audio/webm"
+        )
+
+        response["Content-Disposition"] = f'inline; filename="{message.voice_file_name or "voice.webm"}"'
+        return response
+
+    if message.voice_note and message.voice_note.name:
+        try:
+            return HttpResponse(
+                message.voice_note.read(),
+                content_type="audio/webm"
+            )
+        except ValueError:
+            return HttpResponse("Voice file not found", status=404)
+
+    return HttpResponse("Voice not found", status=404)

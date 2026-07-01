@@ -20,6 +20,7 @@
           <a href="{% url 'home' %}">Chats</a>
           <a href="{% url 'users' %}">Find User</a>
           <a href="{% url 'profile_view' request.user.id %}">My Profile</a>
+          <a href="{% url 'account_settings' %}">Settings</a>
           {% if request.user.is_staff %}
             <a href="{% url 'admin_dashboard' %}">Admin Dashboard</a>
           {% endif %}
