@@ -9,6 +9,21 @@
     <link rel="stylesheet" href="{% static 'css/style.css' %}" />
   </head>
   <body>
+    <script>
+      (function () {
+        function setAppHeight() {
+          var h = (window.visualViewport && window.visualViewport.height) || window.innerHeight;
+          document.documentElement.style.setProperty('--app-height', h + 'px');
+        }
+        setAppHeight();
+        window.addEventListener('resize', setAppHeight);
+        window.addEventListener('orientationchange', setAppHeight);
+        if (window.visualViewport) {
+          window.visualViewport.addEventListener('resize', setAppHeight);
+        }
+      })();
+    </script>
+
     <nav class="navbar">
       <a href="{% url 'home' %}" class="brand">
         <span class="brand-icon">💬</span>
