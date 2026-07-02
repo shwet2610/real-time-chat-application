@@ -936,6 +936,7 @@ main { min-height: calc(var(--app-height) - 74px); }
     touch-action: manipulation;
     -webkit-user-select: none;
     user-select: none;
+    -webkit-touch-callout: none;
 }
 
 .bubble-row.outgoing .bubble {
