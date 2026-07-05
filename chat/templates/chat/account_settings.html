@@ -1,12 +1,26 @@
 {% extends 'chat/base.html' %}
 
 {% block content %}
-<div class="settings-page-container">
+<script>
+    document.body.classList.add("settings-page-body");
+</script>
 
-    <div class="settings-header-card">
-        <div>
-            <h1>Account Settings</h1>
-            <p>Manage your profile, account details and password.</p>
+<div class="settings-page-container insta-settings-page">
+
+    <div class="settings-hero-card">
+        <div class="settings-hero-left">
+            {% if profile.profile_picture and profile.profile_picture.name %}
+                <img src="{{ profile.profile_picture.url }}" class="settings-hero-avatar" alt="Profile">
+            {% else %}
+                <div class="settings-hero-avatar settings-hero-avatar-fallback">
+                    {{ request.user.username|first|upper }}
+                </div>
+            {% endif %}
+
+            <div>
+                <h1>Account Settings</h1>
+                <p>@{{ request.user.username }} · Manage your profile and security</p>
+            </div>
         </div>
 
         <a href="{% url 'profile_view' request.user.id %}" class="main-btn settings-profile-btn">
@@ -14,84 +28,223 @@
         </a>
     </div>
 
-    <div class="settings-grid">
+    <div class="settings-grid insta-settings-grid">
 
-        <div class="settings-card">
-            <h2>Profile Details</h2>
-            <p class="settings-subtitle">Update username, email, bio and profile photo.</p>
+        <div class="settings-card insta-settings-card">
+            <div class="settings-card-head">
+                <div>
+                    <h2>Profile Details</h2>
+                    <p class="settings-subtitle">Update your public profile information.</p>
+                </div>
+                <span class="settings-chip">Public</span>
+            </div>
 
             <form method="POST" enctype="multipart/form-data" class="settings-form">
                 {% csrf_token %}
 
                 <input type="hidden" name="form_type" value="profile">
 
-                <label>Username</label>
-                <input 
-                    type="text" 
-                    name="username" 
-                    value="{{ request.user.username }}" 
-                    required
-                >
+                <div class="settings-field">
+                    <label>Username</label>
+                    <input
+                        type="text"
+                        name="username"
+                        value="{{ request.user.username }}"
+                        autocomplete="username"
+                        readonly
+                    >
+                    <span class="field-hint">Username cannot be changed</span>
+                </div>
 
-                <label>Email</label>
-                <input 
-                    type="email" 
-                    name="email" 
-                    value="{{ request.user.email }}"
-                    placeholder="Enter your email"
-                >
+                <div class="settings-field">
+                    <label>Email</label>
+                    <input 
+                        type="email" 
+                        name="email" 
+                        value="{{ request.user.email }}"
+                        placeholder="Enter your email"
+                        autocomplete="email"
+                    >
+                </div>
 
-                <label>Full Name</label>
-                <input 
-                    type="text" 
-                    name="full_name" 
-                    value="{{ profile.full_name }}"
-                    placeholder="Enter your full name"
-                >
+                <div class="settings-field">
+                    <label>Full Name</label>
+                    <input 
+                        type="text" 
+                        name="full_name" 
+                        value="{{ profile.full_name }}"
+                        placeholder="Enter your full name"
+                        autocomplete="name"
+                    >
+                </div>
 
-                <label>Bio</label>
-                <textarea 
-                    name="bio" 
-                    maxlength="180"
-                    placeholder="Write something about yourself..."
-                >{{ profile.bio }}</textarea>
+                <div class="settings-field">
+                    <label>Bio</label>
+                    <textarea 
+                        name="bio" 
+                        maxlength="180"
+                        placeholder="Write something about yourself..."
+                    >{{ profile.bio }}</textarea>
+                </div>
 
-                <label>Profile Picture</label>
-                <input type="file" name="profile_picture" accept="image/*">
+                <div class="settings-field">
+                    <label>Profile Picture</label>
+                    <input type="file" name="profile_picture" accept="image/*">
+                </div>
 
-                <button type="submit" class="main-btn">Save Changes</button>
+                <button type="submit" class="main-btn settings-save-btn">Save Changes</button>
             </form>
         </div>
 
-        <div class="settings-card">
-            <h2>Change Password</h2>
-            <p class="settings-subtitle">Use a strong password for better security.</p>
+        <div class="settings-card insta-settings-card">
+            <div class="settings-card-head">
+                <div>
+                    <h2>Preferences</h2>
+                    <p class="settings-subtitle">App behavior and notifications.</p>
+                </div>
+            </div>
 
-            <form method="POST" class="settings-form">
+            <div class="pref-row">
+                <div>
+                    <h4>Notification Sounds</h4>
+                    <p>Play a sound when receiving a new message</p>
+                </div>
+
+                <button type="button" id="settingsSoundToggle" class="pref-switch" role="switch" aria-checked="true">
+                    <span class="pref-switch-knob"></span>
+                </button>
+            </div>
+        </div>
+
+        <div class="settings-card insta-settings-card password-settings-card">
+            <div class="settings-card-head">
+                <div>
+                    <h2>Security</h2>
+                    <p class="settings-subtitle">Update your password</p>
+                </div>
+                <span class="settings-chip danger">Private</span>
+            </div>
+
+            <div class="password-note">
+                <strong>Note:</strong>
+                Password fields will activate only when you tap/click them.
+            </div>
+
+            <form method="POST" class="settings-form" autocomplete="off">
                 {% csrf_token %}
 
                 <input type="hidden" name="form_type" value="password">
 
-                <label>Old Password</label>
-                {{ password_form.old_password }}
+                <div class="settings-field">
+                    <label>Current Password</label>
+                    <input 
+                        type="password" 
+                        name="old_password" 
+                        autocomplete="off"
+                        placeholder="Enter old password"
+                        data-password-field
+                        readonly
+                    >
+                    {% if password_form.old_password.errors %}
+                        <div class="field-error">{{ password_form.old_password.errors }}</div>
+                    {% endif %}
+                </div>
 
-                <label>New Password</label>
-                {{ password_form.new_password1 }}
+                <div class="settings-field">
+                    <label>New Password</label>
+                    <input 
+                        type="password" 
+                        name="new_password1" 
+                        autocomplete="new-password"
+                        placeholder="Enter new password"
+                        data-password-field
+                        readonly
+                    >
+                    {% if password_form.new_password1.errors %}
+                        <div class="field-error">{{ password_form.new_password1.errors }}</div>
+                    {% endif %}
+                </div>
 
-                <label>Confirm New Password</label>
-                {{ password_form.new_password2 }}
+                <div class="settings-field">
+                    <label>Confirm New Password</label>
+                    <input 
+                        type="password" 
+                        name="new_password2" 
+                        autocomplete="new-password"
+                        placeholder="Confirm new password"
+                        data-password-field
+                        readonly
+                    >
+                    {% if password_form.new_password2.errors %}
+                        <div class="field-error">{{ password_form.new_password2.errors }}</div>
+                    {% endif %}
+                </div>
 
-                {% if password_form.errors %}
+                {% if password_form.non_field_errors %}
                     <div class="settings-errors">
-                        {{ password_form.errors }}
+                        {{ password_form.non_field_errors }}
                     </div>
                 {% endif %}
 
-                <button type="submit" class="main-btn">Update Password</button>
+                <button type="submit" class="main-btn settings-save-btn">Change Password</button>
             </form>
         </div>
 
     </div>
 
 </div>
+
+<script>
+    (function () {
+        if ('scrollRestoration' in history) {
+            history.scrollRestoration = 'manual';
+        }
+
+        function resetSettingsScroll() {
+            if (document.activeElement && document.activeElement.blur) {
+                document.activeElement.blur();
+            }
+            window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+        }
+
+        window.addEventListener('pageshow', resetSettingsScroll);
+        window.addEventListener('load', resetSettingsScroll);
+
+        (function () {
+            const toggleBtn = document.getElementById('settingsSoundToggle');
+            if (!toggleBtn) return;
+
+            function applyState(enabled) {
+                toggleBtn.classList.toggle('is-on', enabled);
+                toggleBtn.setAttribute('aria-checked', enabled ? 'true' : 'false');
+            }
+
+            applyState(localStorage.getItem('chat_sound_enabled') !== 'false');
+
+            toggleBtn.addEventListener('click', function () {
+                const nextEnabled = !toggleBtn.classList.contains('is-on');
+                applyState(nextEnabled);
+                document.dispatchEvent(new CustomEvent('chatbridge:sound-toggle-request', {
+                    detail: { enabled: nextEnabled }
+                }));
+            });
+
+            document.addEventListener('chatbridge:sound-changed', function (event) {
+                applyState(!!(event.detail && event.detail.enabled));
+            });
+        })();
+
+        document.querySelectorAll('[data-password-field]').forEach(function (input) {
+            input.setAttribute('readonly', 'readonly');
+
+            function activatePasswordInput() {
+                input.removeAttribute('readonly');
+            }
+
+            input.addEventListener('pointerdown', activatePasswordInput, { once: true });
+            input.addEventListener('touchstart', activatePasswordInput, { once: true });
+            input.addEventListener('keydown', activatePasswordInput, { once: true });
+        });
+    })();
+</script>
 {% endblock %}

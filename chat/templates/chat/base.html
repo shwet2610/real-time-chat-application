@@ -4,7 +4,12 @@
   <head>
     <meta charset="UTF-8" />
     <title>ChatBridge</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="theme-color" content="#080b12" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Sora:wght@500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet" />
 
     <link rel="stylesheet" href="{% static 'css/style.css' %}" />
   </head>
@@ -24,48 +29,137 @@
       })();
     </script>
 
-    <nav class="navbar">
-      <a href="{% url 'home' %}" class="brand">
-        <span class="brand-icon">💬</span>
-        <span>ChatBridge</span>
-      </a>
+    <div class="app-shell">
 
-      <div class="nav-links">
+      <aside class="sidebar" id="appSidebar">
+        <a href="{% url 'home' %}" class="brand" aria-label="ChatBridge home">
+          <span class="brand-icon">CB</span>
+          <span class="brand-text">ChatBridge</span>
+        </a>
+
         {% if user.is_authenticated %}
-          <a href="{% url 'home' %}">Chats</a>
-          <a href="{% url 'users' %}">Find User</a>
-          <a href="{% url 'profile_view' request.user.id %}">My Profile</a>
-          <a href="{% url 'account_settings' %}">Settings</a>
-          {% if request.user.is_staff %}
-            <a href="{% url 'admin_dashboard' %}">Admin Dashboard</a>
-          {% endif %}
+          <nav class="sidebar-nav">
+            <a href="{% url 'home' %}" class="sidebar-link {% if request.resolver_match.url_name == 'home' %}active{% endif %}">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H8l-4 4V5a2 2 0 0 1 2-2h13a2 2 0 0 1 2 2z"/></svg>
+              Chats
+            </a>
+            <a href="{% url 'users' %}" class="sidebar-link {% if request.resolver_match.url_name == 'users' %}active{% endif %}">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              Find User
+            </a>
+            <a href="{% url 'profile_view' request.user.id %}" class="sidebar-link">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              Profile
+            </a>
+            <a href="{% url 'account_settings' %}" class="sidebar-link {% if request.resolver_match.url_name == 'account_settings' %}active{% endif %}">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Settings
+            </a>
+            {% if request.user.is_staff %}
+              <a href="{% url 'admin_dashboard' %}" class="sidebar-link {% if request.resolver_match.url_name == 'admin_dashboard' %}active{% endif %}">
+                <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 5v6c0 5 3.5 9 8 11 4.5-2 8-6 8-11V5z"/></svg>
+                Admin
+              </a>
+            {% endif %}
+          </nav>
 
-          {% if request.user.is_authenticated %}
-            <button type="button" id="globalSoundToggleBtn" class="global-sound-toggle" title="Notification sound">🔔</button>
-          {% endif %}
+          <div class="sidebar-spacer"></div>
 
-          <span class="nav-user">{{ user.username }}</span>
-          <a href="{% url 'logout' %}" class="logout-btn">Logout</a>
+          <div class="sidebar-bottom">
+            <a href="{% url 'profile_view' request.user.id %}" class="sidebar-user-card">
+              {% if request.user.profile.profile_picture and request.user.profile.profile_picture.name %}
+                <span class="sidebar-user-avatar"><img src="{{ request.user.profile.profile_picture.url }}" alt="Profile"></span>
+              {% else %}
+                <span class="sidebar-user-avatar">{{ request.user.username|first|upper }}</span>
+              {% endif %}
+              <span class="sidebar-user-meta">
+                <strong>{{ request.user.username }}</strong>
+                <span>@{{ request.user.username }}</span>
+              </span>
+            </a>
+
+            <button type="button" id="globalSoundToggleBtn" class="sidebar-action-btn">
+              <span class="icon">🔔</span>
+              <span id="globalSoundToggleLabel">Sound on</span>
+            </button>
+
+            <a href="{% url 'logout' %}" class="sidebar-action-btn danger">
+              <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:18px;height:18px;flex-shrink:0;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+              Log out
+            </a>
+          </div>
         {% else %}
-          <a href="{% url 'login' %}">Login</a>
-          <a href="{% url 'register' %}">Register</a>
+          <nav class="sidebar-nav">
+            <a href="{% url 'login' %}" class="sidebar-link">Login</a>
+            <a href="{% url 'register' %}" class="sidebar-link sidebar-register-link">Register</a>
+          </nav>
         {% endif %}
+      </aside>
+
+      <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
+
+      <div class="app-content">
+
+        <div class="mobile-topbar">
+          <a href="{% url 'home' %}" class="brand" aria-label="ChatBridge home">
+            <span class="brand-icon">CB</span>
+            <span class="brand-text">ChatBridge</span>
+          </a>
+
+          <button type="button" class="nav-toggle" id="navToggleBtn" aria-label="Open menu" aria-expanded="false">
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
+
+        {% if messages %}
+          <div class="toast-area">
+            {% for message in messages %}
+              <div class="toast {{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <main>
+          {% block content %}
+
+          {% endblock %}
+        </main>
+
       </div>
-    </nav>
+    </div>
 
-    {% if messages %}
-      <div class="toast-area">
-        {% for message in messages %}
-          <div class="toast {{ message.tags }}">{{ message }}</div>
-        {% endfor %}
-      </div>
-    {% endif %}
+    <script>
+      (function () {
+        const sidebar = document.getElementById('appSidebar');
+        const toggle = document.getElementById('navToggleBtn');
+        const backdrop = document.getElementById('sidebarBackdrop');
 
-    <main>
-      {% block content %}
+        if (!sidebar || !toggle || !backdrop) return;
 
-      {% endblock %}
-    </main>
+        function closeSidebar() {
+          sidebar.classList.remove('is-open');
+          backdrop.classList.remove('is-open');
+          toggle.classList.remove('is-active');
+          toggle.setAttribute('aria-expanded', 'false');
+        }
+
+        function toggleSidebar() {
+          const isOpen = sidebar.classList.toggle('is-open');
+          backdrop.classList.toggle('is-open', isOpen);
+          toggle.classList.toggle('is-active', isOpen);
+          toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        }
+
+        toggle.addEventListener('click', toggleSidebar);
+        backdrop.addEventListener('click', closeSidebar);
+
+        sidebar.querySelectorAll('a').forEach(function (link) {
+          link.addEventListener('click', closeSidebar);
+        });
+      })();
+    </script>
 
     {% if user.is_authenticated %}
       <script>
@@ -148,6 +242,7 @@
 <script>
     const globalChatListApiUrl = "{% url 'chat_list_api' %}";
     const globalSoundToggleBtn = document.getElementById("globalSoundToggleBtn");
+    const globalSoundToggleLabel = document.getElementById("globalSoundToggleLabel");
 
     let globalNotificationSoundEnabled = localStorage.getItem("chat_sound_enabled") !== "false";
     let firstUnreadCheckDone = false;
@@ -168,13 +263,21 @@
             return;
         }
 
+        const icon = globalSoundToggleBtn.querySelector(".icon");
+
         if (globalNotificationSoundEnabled) {
-            globalSoundToggleBtn.textContent = "🔔";
+            if (icon) icon.textContent = "🔔";
+            if (globalSoundToggleLabel) globalSoundToggleLabel.textContent = "Sound on";
             globalSoundToggleBtn.classList.remove("muted");
         } else {
-            globalSoundToggleBtn.textContent = "🔕";
+            if (icon) icon.textContent = "🔕";
+            if (globalSoundToggleLabel) globalSoundToggleLabel.textContent = "Sound off";
             globalSoundToggleBtn.classList.add("muted");
         }
+
+        document.dispatchEvent(new CustomEvent("chatbridge:sound-changed", {
+            detail: { enabled: globalNotificationSoundEnabled }
+        }));
     }
 
     function playGlobalMessageSound() {
@@ -252,6 +355,12 @@
             updateGlobalSoundButton();
         });
     }
+
+    document.addEventListener("chatbridge:sound-toggle-request", function (event) {
+        globalNotificationSoundEnabled = !!(event.detail && event.detail.enabled);
+        localStorage.setItem("chat_sound_enabled", globalNotificationSoundEnabled ? "true" : "false");
+        updateGlobalSoundButton();
+    });
 
     updateGlobalSoundButton();
     checkUnreadNotifications();

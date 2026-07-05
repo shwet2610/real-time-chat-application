@@ -1,52 +1,107 @@
 {% extends 'chat/base.html' %}
 
 {% block content %}
-<div class="dashboard-container">
+<script>
+    document.body.classList.add("users-page-body");
+</script>
 
-    <div class="dashboard-header">
-        <h1>Find Users</h1>
-        <p>Search by username or email to start a private chat.</p>
+<div class="dashboard-container insta-users-page">
+
+    <div class="find-user-hero">
+        <div>
+            <span class="find-user-kicker">Discover</span>
+            <h1>Find Users</h1>
+            <p>Search people by username or email and start a private conversation.</p>
+        </div>
+
+        <a href="{% url 'home' %}" class="find-user-back-btn">
+            Back to Chats
+        </a>
     </div>
 
-    <form method="GET" class="search-box">
+    <form method="GET" class="insta-search-box">
+        <div class="insta-search-icon">⌕</div>
+
         <input 
             type="text" 
             name="q" 
-            placeholder="Enter username or email..." 
+            placeholder="Search username or email..." 
             value="{{ search_query }}"
+            autocomplete="off"
             required
         >
+
         <button type="submit">Search</button>
     </form>
 
     {% if search_query %}
-        <div class="users-grid">
-            {% if users %}
+        <div class="search-result-title">
+            <div>
+                <h2>Search Results</h2>
+                <p>Showing matches for “{{ search_query }}”</p>
+            </div>
+
+            <span>{{ users|length }} found</span>
+        </div>
+
+        {% if users %}
+            <div class="insta-users-grid">
                 {% for u in users %}
-                    <div class="user-card">
-                        <div class="avatar large-avatar">
-                            {{ u.username|first|upper }}
+                    <div class="insta-user-card">
+                        <div class="insta-user-cover"></div>
+
+                        <div class="insta-user-content">
+                            {% if u.profile.profile_picture and u.profile.profile_picture.name %}
+                                <img src="{{ u.profile.profile_picture.url }}" class="insta-user-avatar" alt="Profile">
+                            {% else %}
+                                <div class="insta-user-avatar insta-user-avatar-fallback">
+                                    {{ u.username|first|upper }}
+                                </div>
+                            {% endif %}
+
+                            <h3>{{ u.username }}</h3>
+
+                            {% if u.profile.full_name %}
+                                <p class="insta-user-name">{{ u.profile.full_name }}</p>
+                            {% else %}
+                                <p class="insta-user-name">ChatBridge User</p>
+                            {% endif %}
+
+                            {% if u.email %}
+                                <p class="insta-user-email">{{ u.email }}</p>
+                            {% endif %}
+
+                            {% if u.profile.bio %}
+                                <p class="insta-user-bio">{{ u.profile.bio|truncatechars:70 }}</p>
+                            {% else %}
+                                <p class="insta-user-bio">No bio added yet.</p>
+                            {% endif %}
+
+                            <div class="insta-user-actions">
+                                <a href="{% url 'profile_view' u.id %}" class="user-outline-btn">
+                                    Profile
+                                </a>
+
+                                <a href="{% url 'start_chat' u.id %}" class="main-btn user-message-btn">
+                                    Message
+                                </a>
+                            </div>
                         </div>
-
-                        <h3>{{ u.username }}</h3>
-                        <p>{{ u.email }}</p>
-
-                        <a href="{% url 'start_chat' u.id %}" class="main-btn">
-                            Start Chat
-                        </a>
                     </div>
                 {% endfor %}
-            {% else %}
-                <div class="empty-box">
-                    <h2>No user found</h2>
-                    <p>No account matched your search.</p>
-                </div>
-            {% endif %}
-        </div>
+            </div>
+        {% else %}
+            <div class="insta-empty-state">
+                <div class="insta-empty-icon">🔎</div>
+                <h2>No user found</h2>
+                <p>No account matched your search. Try another username or email.</p>
+            </div>
+        {% endif %}
     {% else %}
-        <div class="empty-box">
+        <div class="insta-empty-state">
+            <div class="insta-empty-icon">👥</div>
             <h2>Search to start chatting</h2>
-            <p>Enter the username or email of the person you want to chat with.</p>
+            <p>Enter a username or email to find people on ChatBridge.</p>
         </div>
     {% endif %}
 

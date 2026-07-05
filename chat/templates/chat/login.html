@@ -2,23 +2,43 @@
 
 {% block content %}
 <div class="auth-container">
-    <div class="auth-card">
-        <h2>Welcome Back</h2>
-        <p>Login to your chat account</p>
+    <div class="auth-shell">
+        <section class="auth-brand-panel">
+            <span class="auth-pill">Realtime private chat</span>
+            <h1>Welcome back to ChatBridge</h1>
+            <p>Fast, clean and private messaging built for real conversations with your friends.</p>
+            <div class="auth-feature-list">
+                <span>⚡ Live messages</span>
+                <span>🔔 Smart notifications</span>
+                <span>🎙️ Voice notes</span>
+            </div>
+        </section>
 
-        <form method="POST">
-            {% csrf_token %}
+        <section class="auth-card">
+            <h2>Login</h2>
+            <p>Enter your account details to continue.</p>
 
-            <input type="text" name="username" placeholder="Username" required>
-            <input type="password" name="password" placeholder="Password" required>
+            <form method="POST">
+                {% csrf_token %}
 
-            <button type="submit">Login</button>
-        </form>
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" name="username" placeholder="Enter username" autocomplete="username" required>
+                </div>
 
-        <p class="switch-link">
-            New user?
-            <a href="{% url 'register' %}">Create account</a>
-        </p>
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" name="password" placeholder="Enter password" autocomplete="current-password" required>
+                </div>
+
+                <button type="submit">Login</button>
+            </form>
+
+            <p class="switch-link">
+                New user?
+                <a href="{% url 'register' %}">Create account</a>
+            </p>
+        </section>
     </div>
 </div>
 {% endblock %}

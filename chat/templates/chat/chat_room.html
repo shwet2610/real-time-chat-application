@@ -23,23 +23,7 @@
                   <div class="user-avatar">{{ room_item.other_user.username|first|upper }}</div>
                 {% endif %}
 
-                <span class="status-dot {% if room_item.other_user_is_online %}
-                    
-                    
-                    
-                    online
-
-
-
-                  {% else %}
-                    
-                    
-                    
-                   offline
-
-
-
-                  {% endif %}"
+                <span class="status-dot {% if room_item.other_user_is_online %}online{% else %}offline{% endif %}"
                   data-sidebar-status-user-id="{{ room_item.other_user.id }}">
 
                 </span>
@@ -78,7 +62,7 @@
             </a>
           {% endfor %}
         {% else %}
-          <div class="sidebar-empty">No chats yet</div>
+          <div class="sidebar-empty">No conversations yet</div>
         {% endif %}
       </div>
     </aside>
@@ -97,19 +81,7 @@
 
             <p id="onlineStatus"
               data-user-id="{{ other_user.id }}"
-              class="{% if other_user_is_online %}
-                
-                
-                online-text
-
-
-              {% else %}
-                
-                               
-                offline-text
-
-
-              {% endif %}">
+              class="{% if other_user_is_online %}online-text{% else %}offline-text{% endif %}">
               {% if other_user_is_online %}
                 Online
               {% else %}
@@ -126,19 +98,7 @@
       <div class="chat-body" id="chatMessages">
         {% if messages_list %}
           {% for msg in messages_list %}
-            <div class="bubble-row {% if msg.sender == request.user %}
-                
-                             
-                outgoing
-
-
-              {% else %}
-                
-                
-               incoming
-
-
-              {% endif %}"
+            <div class="bubble-row {% if msg.sender == request.user %}outgoing{% else %}incoming{% endif %}"
               data-message-id="{{ msg.id }}"
               data-sender-id="{{ msg.sender.id }}">
               <div class="bubble">
@@ -235,19 +195,7 @@
           <button type="button" id="cancelReplyBtn">×</button>
         </div>
 
-        {% comment %} <input type="file" id="mediaInput" name="media_file" accept="image/*,.pdf,.doc,.docx,.txt" hidden />
-
-        <div id="mediaPreview" class="media-preview" style="display: none;">
-          <div>
-            <strong id="mediaPreviewName"></strong>
-            <p id="mediaPreviewSize"></p>
-          </div>
-
-          <button type="button" id="cancelMediaBtn">×</button>
-        </div>
-
-        <button type="button" id="attachBtn" class="attach-btn">📎</button> {% endcomment %}
-
+        
         <div id="voicePreview" class="voice-preview" style="display: none;">
           <div class="voice-preview-info">
             <span class="voice-dot"></span>
@@ -479,6 +427,11 @@
       if (replyText) {
         replyText.textContent = ''
       }
+    }
+    
+    function resetMediaInput() {
+      // Attachment UI is currently disabled in the template, so this safe helper
+      // prevents message actions from breaking when clearing compose state.
     }
     
     function clearEditMode() {

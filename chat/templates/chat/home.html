@@ -3,11 +3,31 @@
 {% block content %}
 <div class="dashboard-container">
 
-    <div class="dashboard-header">
-        <h1>Your Chats</h1>
-        <p>Continue your conversations or start a new private chat.</p>
-        <a href="{% url 'users' %}" class="main-btn small-btn">Find User</a>
+    
+    
+    <div class="pro-home-header">
+    <div class="pro-home-title">
+        <h1>Conversations</h1>
+        <p>Your private messages</p>
     </div>
+
+    <div class="pro-home-actions">
+        <a href="{% url 'users' %}" class="pro-new-chat-btn">
+            <span>+</span>
+            New Chat
+        </a>
+    </div>
+</div>
+
+<form method="GET" action="{% url 'users' %}" class="insta-search-box home-search-box">
+    <div class="insta-search-icon">⌕</div>
+    <input
+        type="text"
+        name="q"
+        placeholder="Search users to start a chat..."
+        autocomplete="off"
+    >
+</form>
 
     <div class="chat-list-card" id="chatListCard">
         {% if chatrooms %}
@@ -74,9 +94,9 @@
                 </a>
             {% endfor %}
         {% else %}
-            <div class="empty-box">
-                <h2>No chats yet</h2>
-                <p>Search a user and start your first conversation.</p>
+            <div class="empty-box"><div class="empty-box-icon">💬</div>
+                <h2>No conversations yet</h2>
+                <p>Search for a user above to start your first secure chat.</p>
                 <a href="{% url 'users' %}" class="main-btn">Start New Chat</a>
             </div>
         {% endif %}
@@ -230,9 +250,9 @@
 
             if (data.rooms.length === 0) {
                 chatListCard.innerHTML = `
-                    <div class="empty-box">
-                        <h2>No chats yet</h2>
-                        <p>Search a user and start your first conversation.</p>
+                    <div class="empty-box"><div class="empty-box-icon">💬</div>
+                        <h2>No conversations yet</h2>
+                        <p>Search for a user above to start your first secure chat.</p>
                         <a href="{% url 'users' %}" class="main-btn">Start New Chat</a>
                     </div>
                 `;
