@@ -308,14 +308,14 @@
                     This message was deleted
                   {% elif msg.message %}
                     {{ msg.message|truncatechars:70 }}
-                  {% elif msg.voice_note %}
+                  {% elif msg.voice_data or msg.voice_note %}
                     Voice message
                   {% else %}
                     -
                   {% endif %}
                 </td>
                 <td>
-                  {% if msg.voice_note and msg.voice_note.name %}
+                  {% if msg.voice_data or msg.voice_note and msg.voice_note.name %}
                     Voice
                   {% else %}
                     Text

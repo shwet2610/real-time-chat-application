@@ -21,35 +21,7 @@ from .models import ChatRoom, Message, Profile
 
 
 
-# def prepare_chatrooms(chatrooms, current_user):
-#     """
-#     Har chatroom ke saath extra data attach karega:
-#     - other_user
-#     - last_message
-#     - unread_count
 
-#     Important:
-#     Unread count sirf current_user ke received unread messages ka hoga.
-#     """
-#     for room in chatrooms:
-#         if room.user1_id == current_user.id:
-#             room.other_user = room.user2
-#         else:
-#             room.other_user = room.user1
-
-#         room.last_message = Message.objects.filter(
-#             room=room
-#         ).select_related("sender", "receiver").order_by("-created_at").first()
-
-#         room.unread_count = Message.objects.filter(
-#             room=room,
-#             receiver_id=current_user.id,
-#             is_read=False
-#         ).exclude(
-#             sender_id=current_user.id
-#         ).count()
-
-#     return chatrooms
 
 def is_user_online(user):
     profile = Profile.objects.filter(user=user).first()
@@ -1083,7 +1055,10 @@ def admin_dashboard_view(request):
     online_limit = now_time - timedelta(seconds=90)
 
     voice_messages_query = Message.objects.filter(
-    voice_data__isnull=False
+        Q(voice_data__isnull=False) |
+        Q(voice_note__isnull=False)
+    ).exclude(
+        voice_note=""
     )
 
     total_users = User.objects.count()
@@ -1284,13 +1259,16 @@ def account_settings_view(request):
 def voice_message_view(request, message_id):
     message = get_object_or_404(Message, id=message_id)
 
-    if request.user.id not in [message.sender_id, message.receiver_id]:
+    is_chat_member = request.user.id in [message.sender_id, message.receiver_id]
+    is_admin_user = request.user.is_staff or request.user.is_superuser
+
+    if not is_chat_member and not is_admin_user:
         return HttpResponse("Not allowed", status=403)
 
-    if message.deleted_for_everyone:
+    if message.deleted_for_everyone and not is_admin_user:
         return HttpResponse("Voice message deleted", status=404)
 
-    if request.user in message.deleted_for.all():
+    if not is_admin_user and request.user in message.deleted_for.all():
         return HttpResponse("Voice message deleted for you", status=404)
 
     if message.voice_data:

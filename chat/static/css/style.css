@@ -2819,3 +2819,88 @@ button[type="submit"] {
         transition-duration: 0.001ms !important;
     }
 }
+
+
+/* ===================== Emergency Avatar Image Size Fix ===================== */
+/* Profile/chat avatar image full screen stretch na ho */
+
+.chat-list-item .avatar-holder,
+.sidebar-user .avatar-holder,
+.profile-open-link .avatar-holder {
+    width: 52px !important;
+    height: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    flex: 0 0 52px !important;
+    overflow: visible !important;
+}
+
+.chat-list-item .user-avatar,
+.chat-list-item img.user-avatar,
+.chat-list-item img.avatar-img {
+    width: 52px !important;
+    height: 52px !important;
+    min-width: 52px !important;
+    max-width: 52px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    flex: 0 0 52px !important;
+}
+
+.sidebar-user .user-avatar,
+.sidebar-user img.user-avatar,
+.sidebar-user img.avatar-img {
+    width: 48px !important;
+    height: 48px !important;
+    min-width: 48px !important;
+    max-width: 48px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    flex: 0 0 48px !important;
+}
+
+.chat-panel-header .user-avatar,
+.chat-panel-header img.user-avatar,
+.chat-panel-header img.avatar-img,
+.profile-open-link .user-avatar,
+.profile-open-link img.user-avatar,
+.profile-open-link img.avatar-img {
+    width: 46px !important;
+    height: 46px !important;
+    min-width: 46px !important;
+    max-width: 46px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+    flex: 0 0 46px !important;
+}
+
+/* Home chat list layout safe */
+.chat-list-item {
+    display: flex !important;
+    align-items: center !important;
+    gap: 14px !important;
+    overflow: hidden !important;
+}
+
+.chat-list-item .chat-info {
+    flex: 1 !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+}
+
+.chat-list-item .chat-info h3,
+.chat-list-item .chat-info p {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+
+/* Sirf profile/dashboard ke large images allowed rahenge */
+.app-content > img,
+.dashboard-container > img,
+.chat-list-card > img {
+    max-width: 52px !important;
+    max-height: 52px !important;
+    border-radius: 50% !important;
+    object-fit: cover !important;
+}
