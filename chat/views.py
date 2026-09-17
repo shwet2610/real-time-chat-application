@@ -609,64 +609,7 @@ def edit_message_api(request, room_id, message_id):
         "success": True,
         "message": data
     })
-# @login_required
-# @require_POST
-# def edit_message_api(request, room_id, message_id):
-#     try:
-#         room = ChatRoom.objects.get(id=room_id)
 
-#         if request.user.id not in [room.user1_id, room.user2_id]:
-#             return JsonResponse({"success": False, "error": "Not allowed"}, status=403)
-
-#         message = Message.objects.select_related(
-#             "sender",
-#             "receiver",
-#             "room",
-#             "reply_to",
-#             "reply_to__sender"
-#         ).get(id=message_id, room=room)
-
-#         if message.sender_id != request.user.id:
-#             return JsonResponse({"success": False, "error": "You can edit only your own message"}, status=403)
-
-#         new_text = request.POST.get("message", "").strip()
-
-#         if new_text == "":
-#             return JsonResponse({"success": False, "error": "Empty message"}, status=400)
-        
-#         if message.deleted_for_everyone:
-#             return JsonResponse({
-#                 "success": False,
-#                 "error": "Deleted message cannot be edited."
-#             }, status=400)
-
-#         message.message = new_text
-#         message.is_edited = True
-#         message.edited_at = timezone.now()
-#         message.save()
-
-#         data = serialize_message(message)
-#         data = serialize_message(message, request.user)
-#         data["event_type"] = "message_updated"
-
-#         channel_layer = get_channel_layer()
-
-#         if channel_layer is not None:
-#             async_to_sync(channel_layer.group_send)(
-#                 f"chat_{room.id}",
-#                 {
-#                     "type": "message_updated",
-#                     "data": data,
-#                 }
-#             )
-
-#         return JsonResponse({"success": True, "message": data})
-
-#     except ChatRoom.DoesNotExist:
-#         return JsonResponse({"success": False, "error": "Room not found"}, status=404)
-
-#     except Message.DoesNotExist:
-#         return JsonResponse({"success": False, "error": "Message not found"}, status=404)
 
 
 @login_required
@@ -741,14 +684,7 @@ def chat_list_api(request):
 
         is_online = is_user_online(other_user)
 
-        # if last_message:
-        #     if last_message.deleted_for_everyone:
-        #         last_message_text = "This message was deleted"
-        #     else:
-        #         # last_message_text = last_message.message
-        #         last_message_text = get_last_message_preview(last_message, request.user)
-        # else:
-        #     last_message_text = "No messages yet"
+        
         last_message_text = get_last_message_preview(last_message, request.user)
 
         profile_picture_url = ""
@@ -776,61 +712,7 @@ def chat_list_api(request):
         "rooms": rooms_data,
     })
 
-# @login_required
-# def chat_list_api(request):
-#     chatrooms = ChatRoom.objects.filter(
-#         user1=request.user
-#     ) | ChatRoom.objects.filter(
-#         user2=request.user
-#     )
 
-#     chatrooms = chatrooms.select_related(
-#         "user1",
-#         "user2",
-#         "user1__profile",
-#         "user2__profile"
-#     ).order_by("-updated_at")
-
-#     rooms_data = []
-
-#     for room in chatrooms:
-#         if room.user1 == request.user:
-#             other_user = room.user2
-#         else:
-#             other_user = room.user1
-
-#         last_message = room.messages.order_by("-created_at").first()
-
-#         unread_count = Message.objects.filter(
-#             room=room,
-#             receiver=request.user,
-#             is_read=False
-#         ).count()
-
-#         # same logic jo chat header me use ho raha hai
-#         is_online = False
-
-#         if hasattr(other_user, "profile") and other_user.profile.last_seen:
-#             if other_user.profile.last_seen >= timezone.now() - timedelta(seconds=90):
-#                 is_online = True
-
-#         rooms_data.append({
-#             "room_id": room.id,
-#             "other_user_id": other_user.id,
-#             "other_username": other_user.username,
-#             "avatar": other_user.username[:1].upper(),
-#             "is_online": is_online,
-#             "last_message": last_message.message if last_message else "No messages yet",
-#             "last_sender_id": last_message.sender.id if last_message else None,
-#             "last_time": timezone.localtime(last_message.created_at).strftime("%I:%M %p") if last_message else "",
-#             "unread_count": unread_count,
-#             "chat_url": f"/chat/{room.id}/",
-#         })
-
-#     return JsonResponse({
-#         "success": True,
-#         "rooms": rooms_data,
-#     })
 
 @login_required
 def profile_view(request, user_id):
@@ -988,58 +870,6 @@ def mark_seen_api(request, room_id):
         "status_text": "Seen",
     })
 
-# @staff_member_required
-# def admin_dashboard_view(request):
-#     now_time = timezone.now()
-#     online_limit = now_time - timedelta(seconds=90)
-
-#     total_users = User.objects.count()
-#     total_profiles = Profile.objects.count()
-#     total_chats = ChatRoom.objects.count()
-#     total_messages = Message.objects.count()
-
-#     voice_messages_query = Message.objects.filter(
-#         voice_note__isnull=False
-#     ).exclude(
-#         voice_note=""
-#     )
-
-#     total_voice_messages = voice_messages_query.count()
-#     active_users = Profile.objects.filter(last_seen__gte=online_limit).count()
-
-#     profiles = Profile.objects.select_related("user").order_by("-created_at")[:12]
-
-#     recent_voice_messages = voice_messages_query.select_related(
-#         "sender",
-#         "receiver",
-#         "room"
-#     ).order_by("-created_at")[:10]
-
-#     recent_chats = ChatRoom.objects.select_related(
-#         "user1",
-#         "user2"
-#     ).annotate(
-#         message_count=Count("messages")
-#     ).order_by("-updated_at")[:10]
-
-#     recent_messages = Message.objects.select_related(
-#         "sender",
-#         "receiver",
-#         "room"
-#     ).order_by("-created_at")[:12]
-
-#     return render(request, "chat/admin_dashboard.html", {
-#         "total_users": total_users,
-#         "total_profiles": total_profiles,
-#         "total_chats": total_chats,
-#         "total_messages": total_messages,
-#         "total_voice_messages": total_voice_messages,
-#         "active_users": active_users,
-#         "profiles": profiles,
-#         "recent_voice_messages": recent_voice_messages,
-#         "recent_chats": recent_chats,
-#         "recent_messages": recent_messages,
-#     })
 
 
 @staff_member_required
@@ -1056,9 +886,10 @@ def admin_dashboard_view(request):
 
     voice_messages_query = Message.objects.filter(
         Q(voice_data__isnull=False) |
-        Q(voice_note__isnull=False)
-    ).exclude(
-        voice_note=""
+        (
+            Q(voice_note__isnull=False) &
+            ~Q(voice_note="")
+        )
     )
 
     total_users = User.objects.count()
@@ -1289,4 +1120,5 @@ def voice_message_view(request, message_id):
         except ValueError:
             return HttpResponse("Voice file not found", status=404)
 
-    return HttpResponse("Voice not found", status=404)
+    return HttpResponse("Voice not found", status=404)      
+
